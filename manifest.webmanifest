@@ -1,0 +1,7 @@
+{
+  "name":"Saad PS2 Ultimate",
+  "short_name":"Saad PS2",
+  "description":"مدير مكتبة ألعاب PlayStation 2 وملفات OPL",
+  "lang":"ar","dir":"rtl","start_url":"./","scope":"./","display":"standalone",
+  "background_color":"#080d18","theme_color":"#080d18","icons":[]
+}
