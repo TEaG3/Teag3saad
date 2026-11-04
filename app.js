@@ -9,7 +9,8 @@ function msg(t,error=false){const e=$("toast");e.textContent=t;e.className="toas
 function log(t){S.logs.unshift({t,at:new Date().toLocaleString("ar-IQ")});$("logs").innerHTML=S.logs.map(x=>'<div class="log-entry">'+esc(x.t)+' <small>— '+esc(x.at)+'</small></div>').join("");}
 function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 function valid(id){return /^[A-Z]{4}_\d{3}\.\d{2}$/.test(String(id||"").toUpperCase().replace("-","_"));}
-function validRecordKey(id){return valid(id)||/^UL_[A-F0-9]{8}$/.test(String(id||""));}
+function validRecordKey(id){return valid(id)||/^(UL|FILE)_[A-F0-9]{8}$/.test(String(id||""));}
+function localKey(prefix,value){let h=2166136261;for(const c of String(value)){h^=c.charCodeAt(0);h=Math.imul(h,16777619);}return prefix+"_"+(h>>>0).toString(16).toUpperCase().padStart(8,"0");}
 function effectiveId(g){const id=g?.oplGameId||(valid(g?.gameId)?g.gameId:"");return valid(id)?String(id).toUpperCase().replace("-","_"):"";}
 function idFromName(name){const m=String(name||"").toUpperCase().match(/\b([A-Z]{4}[_-]\d{3}\.\d{2})\b/);return m?m[1].replace("-","_"):null;}
 function fmt(n){if(!n)return "—";let u=["B","KB","MB","GB"],i=0;while(n>=1024&&i<3){n/=1024;i++;}return n.toFixed(i?1:0)+" "+u[i];}
@@ -28,7 +29,7 @@ async function scanFolder(root,name){
    try{
     const f=await e.getFile(),isIso=/\.iso$/i.test(e.name);
     const id=isIso?await gameId(f):idFromName(e.name);
-    out.push({title:e.name.replace(/\.(iso|zso)$/i,""),gameId:id||"UNKNOWN",oplGameId:id||null,format:isIso?"ISO":"ZSO",size:f.size,hasCover:false,hasIcon:false,source:name+"/"+e.name});
+    out.push({title:e.name.replace(/\.(iso|zso)$/i,""),gameId:id||localKey("FILE",name+"/"+e.name.toLowerCase()),oplGameId:id||null,format:isIso?"ISO":"ZSO",size:f.size,hasCover:false,hasIcon:false,source:name+"/"+e.name});
    }catch(err){log("تعذر قراءة "+e.name);}
   }
  }catch(e){}
@@ -173,7 +174,7 @@ async function saveGameMeta(){
  if(year&&!/^\d{4}$/.test(year)){msg("أدخل سنة صحيحة من أربعة أرقام.",true);return;}
  if(rating&&(!Number.isFinite(Number(rating))||Number(rating)<0||Number(rating)>10)){msg("التقييم يجب أن يكون بين 0 و10.",true);return;}
  const row={gameId:g.gameId,oplGameId:oplGameId||null,title:$("metaTitle").value.trim().slice(0,120),genre:$("metaGenre").value.trim().slice(0,60),region:$("metaRegion").value.trim().slice(0,30),year,rating,notes:$("metaNotes").value.trim().slice(0,1000),updatedAt:new Date().toISOString()};
- try{await putMetadata(row);g.meta=row;g.oplGameId=row.oplGameId||(valid(g.gameId)?g.gameId:null);$("gameDialog").hidden=true;render();log("حُفظت بيانات "+g.gameId+" محلياً.");msg("تم حفظ بيانات اللعبة.");}
+ try{await putMetadata(row);g.meta=row;g.oplGameId=row.oplGameId||(valid(g.gameId)?g.gameId:null);await inspect();$("gameDialog").hidden=true;render();log("حُفظت بيانات "+g.gameId+" محلياً.");msg("تم حفظ بيانات اللعبة.");}
  catch(e){msg("فشل الحفظ: "+e.message,true);}
 }
 async function backupDb(){try{const payload={app:"Saad PS2 Ultimate",schema:1,exportedAt:new Date().toISOString(),games:await allMetadata()},url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:"application/json"})),a=document.createElement("a");a.href=url;a.download="saad-ps2-database-backup.json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1200);msg("تم إنشاء النسخة الاحتياطية.");}catch(e){msg("تعذر إنشاء النسخة: "+e.message,true);}}
