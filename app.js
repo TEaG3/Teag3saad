@@ -102,10 +102,15 @@ async function convertArt(blob,type,width,height,cropSquare=false){
  canvas.width=width;canvas.height=height;
  const ctx=canvas.getContext("2d");
  if(!ctx){bmp.close();throw new Error("تعذر تجهيز الصورة");}
+ if(type==="image/jpeg"){ctx.fillStyle="#ffffff";ctx.fillRect(0,0,width,height);}
  if(cropSquare){
   const side=Math.min(bmp.width,bmp.height),sx=(bmp.width-side)/2,sy=(bmp.height-side)/2;
   ctx.drawImage(bmp,sx,sy,side,side,0,0,width,height);
- }else{ctx.drawImage(bmp,0,0,width,height);}
+ }else{
+  const scale=Math.min(width/bmp.width,height/bmp.height);
+  const drawWidth=Math.max(1,Math.round(bmp.width*scale)),drawHeight=Math.max(1,Math.round(bmp.height*scale));
+  ctx.drawImage(bmp,Math.round((width-drawWidth)/2),Math.round((height-drawHeight)/2),drawWidth,drawHeight);
+ }
  bmp.close();
  const converted=await new Promise(resolve=>canvas.toBlob(resolve,type,type==="image/jpeg"?0.9:undefined));
  if(!converted)throw new Error("تعذر تحويل الصورة إلى "+type);
