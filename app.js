@@ -37,25 +37,32 @@ async function scanFolder(root,name){
 }
 async function parseUl(root,h){
  const f=await h.getFile(),b=new Uint8Array(await f.arrayBuffer()),out=[],rootFiles=[];
- for await(const e of root.values())if(e.kind==="file")rootFiles.push(e);
- const dec=new TextDecoder("ascii");
- for(let o=0,index=0;o+64<=b.length;o+=64,index++){
-  const name=dec.decode(b.slice(o,o+32)).split("\0")[0].trim();
-  const image=dec.decode(b.slice(o+32,o+47)).split("\0")[0].trim();
+ for await(const entry of root.values())if(entry.kind==='file')rootFiles.push(entry);
+ const dec=new TextDecoder('ascii'),recordSize=64;
+ if(b.length%recordSize)log('تحذير: حجم ul.cfg ليس مضاعفاً لـ 64 بايت؛ قد توجد سجلات غير مكتملة.');
+ for(let o=0,index=0;o+recordSize<=b.length;o+=recordSize,index++){
+  const name=dec.decode(b.slice(o,o+32)).split('\0')[0].trim();
+  const magic=dec.decode(b.slice(o+32,o+35));
+  const startup=dec.decode(b.slice(o+35,o+47)).split('\0')[0].trim().toUpperCase();
   const parts=b[o+47],media=b[o+48];
-  if(!name||!image)continue;
-  const fullId=idFromName(image);
-  const crcMatch=image.match(/^ul\.([0-9a-f]{8})/i);
-  if(!fullId&&!crcMatch)continue;
-  const crc=crcMatch?crcMatch[1].toUpperCase():String(index+1).padStart(8,"0");
-  const key=fullId||("UL_"+crc);
-  const partPrefix=crcMatch?("ul."+crcMatch[1]).toLowerCase():null;
-  const related=partPrefix?rootFiles.filter(e=>e.name.toLowerCase().startsWith(partPrefix+".")&&/^ul\.[0-9a-f]{8}\..+\.\d{2}$/i.test(e.name)):[];
-  let size=0;
-  for(const e of related){try{size+=(await e.getFile()).size;}catch(err){}}
-  let suffix="";
-  for(const e of related){const m=e.name.match(/^ul\.[0-9a-f]{8}\.([a-z]_\d{3}\.\d{2})\.\d{2}$/i);if(m){suffix=m[1].toUpperCase();break;}}
-  out.push({title:name,gameId:key,oplGameId:fullId||null,format:"UL",size,hasCover:false,hasIcon:false,source:"ul.cfg",ulImage:image,ulCrc:crc,ulParts:parts,ulMedia:media===0x12?"CD":media===0x14?"DVD":"UNKNOWN",ulAvailableParts:related.length,ulSerialSuffix:suffix});
+  if(!name||magic!=='ul.')continue;
+  const fullId=idFromName(startup);
+  const key=fullId||localKey('UL',startup+'|'+name+'|'+index);
+  const escaped=startup.replaceAll('.', '\\.');
+  const partPattern=new RegExp('^ul\\.[0-9a-f]{8}\\.'+escaped+'\\.([0-9a-f]{2})$','i');
+  const availableParts=[],seen=new Set();let size=0,crc='';
+  if(startup){
+   for(const entry of rootFiles){
+    const match=entry.name.match(partPattern);if(!match)continue;
+    const partNumber=parseInt(match[1],16);if(!Number.isFinite(partNumber)||seen.has(partNumber))continue;
+    seen.add(partNumber);availableParts.push(partNumber);
+    if(!crc){const prefix=entry.name.match(/^ul\\.([0-9a-f]{8})\\./i);if(prefix)crc=prefix[1].toUpperCase();}
+    try{size+=(await entry.getFile()).size;}catch(err){}
+   }
+  }
+  availableParts.sort((x,y)=>x-y);
+  const complete=parts>0&&availableParts.length===parts&&availableParts.every((n,i)=>n===i);
+  out.push({title:name,gameId:key,oplGameId:fullId||null,format:'UL',size,hasCover:false,hasIcon:false,source:'ul.cfg',ulStartup:startup,ulCrc:crc,ulParts:parts,ulAvailableParts:availableParts.length,ulMissingParts:Math.max(0,parts-availableParts.length),ulPartsComplete:complete,ulPartNumbers:availableParts,ulMedia:media===0x12?'CD':media===0x14?'DVD':'UNKNOWN'});
  }
  return out;
 }
@@ -78,22 +85,24 @@ async function scan(){
   try{S.games.push(...await parseUl(S.root,await S.root.getFileHandle("ul.cfg")));}catch(e){}
   await hydrateMetadata();await inspect();render();
   const unknownUl=S.games.filter(g=>g.format==="UL"&&!effectiveId(g)).length;
-  log("اكتمل الفحص: "+S.games.length+" لعبة.");
-  msg("اكتمل الفحص: "+S.games.length+" لعبة."+ (unknownUl?" · عيّن Game ID لألعاب UL من التفاصيل.":""));
+  const incompleteUl=S.games.filter(g=>g.format==="UL"&&!g.ulPartsComplete).length;
+  log("اكتمل الفحص: "+S.games.length+" لعبة. ألعاب UL غير المكتملة: "+incompleteUl+".");
+  msg("اكتمل الفحص: "+S.games.length+" لعبة."+ (unknownUl?" · عيّن Game ID لألعاب UL من التفاصيل.":"")+(incompleteUl?" · تحقق من أجزاء UL الناقصة.":""));
  }catch(e){if(e.name!=="AbortError")msg("تعذر فحص المجلد: "+e.message,true);}
 }
 function render(){
- const iso=S.games.filter(g=>g.format==="ISO").length,zso=S.games.filter(g=>g.format==="ZSO").length,ul=S.games.filter(g=>g.format==="UL").length,cov=S.games.filter(g=>g.hasCover).length;
+ const iso=S.games.filter(g=>g.format==='ISO').length,zso=S.games.filter(g=>g.format==='ZSO').length,ul=S.games.filter(g=>g.format==='UL').length,cov=S.games.filter(g=>g.hasCover).length;
  const miss=S.games.filter(g=>!effectiveId(g)||!g.hasCover||!g.hasIcon).length;
- $("total").textContent=S.games.length;$("iso").textContent=iso+zso;$("ul").textContent=ul;$("covers").textContent=cov;
- $("allCount").textContent=S.games.length;$("missingCount").textContent=miss;
- $("sGames").textContent=S.games.length;$("sIso").textContent=iso+zso;$("sUl").textContent=ul;$("sSize").textContent=fmt(S.games.reduce((a,g)=>a+g.size,0));
- $("csv").disabled=!S.games.length;$("rescan").disabled=!S.root;$("missing").disabled=!S.games.length;$("all").disabled=!S.games.length;
- const rows=S.games.filter(g=>(!S.query||(((g.meta?.title||g.title)+" "+(effectiveId(g)||g.gameId)).toLowerCase().includes(S.query)))&&(S.filter==="all"||(S.filter==="missing"&&(!effectiveId(g)||!g.hasCover||!g.hasIcon))||S.filter===g.format));
- $("games").innerHTML=rows.length?rows.map(g=>{
-  const id=effectiveId(g),displayId=id||g.gameId,cover=id?coverUrls(id)[0]:"";
-  return '<tr><td>'+(cover?'<img class="cover" src="'+cover+'" onerror="this.style.visibility=\'hidden\'" alt="">':'—')+'</td><td>'+esc(g.meta?.title||g.title)+'</td><td class="id">'+esc(displayId)+'</td><td>'+g.format+'</td><td>'+fmt(g.size)+'</td><td><span class="tag '+(g.hasCover?"ok":"bad")+'">'+(g.hasCover?"متوفر":"ناقص")+'</span></td><td><span class="tag '+(g.hasIcon?"ok":"bad")+'">'+(g.hasIcon?"متوفر":"ناقص")+'</span></td><td><button class="row-action" data-game="'+esc(g.gameId)+'">تفاصيل</button></td></tr>';
- }).join(""):'<tr><td colspan="8" class="empty">لا توجد نتائج.</td></tr>';
+ $('total').textContent=S.games.length;$('iso').textContent=iso+zso;$('ul').textContent=ul;$('covers').textContent=cov;
+ $('allCount').textContent=S.games.length;$('missingCount').textContent=miss;
+ $('sGames').textContent=S.games.length;$('sIso').textContent=iso+zso;$('sUl').textContent=ul;$('sSize').textContent=fmt(S.games.reduce((a,g)=>a+g.size,0));
+ $('csv').disabled=!S.games.length;$('rescan').disabled=!S.root;$('missing').disabled=!S.games.length;$('all').disabled=!S.games.length;
+ const rows=S.games.filter(g=>(!S.query||(((g.meta?.title||g.title)+' '+(effectiveId(g)||g.gameId)).toLowerCase().includes(S.query)))&&(S.filter==='all'||(S.filter==='missing'&&(!effectiveId(g)||!g.hasCover||!g.hasIcon))||S.filter===g.format));
+ $('games').innerHTML=rows.length?rows.map(g=>{
+  const id=effectiveId(g),displayId=id||g.gameId,cover=id?coverUrls(id)[0]:'';
+  const partsCell=g.format==='UL'?('<span class="tag '+(g.ulPartsComplete?'ok':'bad')+'">'+g.ulAvailableParts+'/'+g.ulParts+'</span>'):'—';
+  return '<tr><td>'+(cover?'<img class="cover" src="'+cover+'" onerror="this.style.visibility=\'hidden\'" alt="">':'—')+'</td><td>'+esc(g.meta?.title||g.title)+'</td><td class="id">'+esc(displayId)+'</td><td>'+g.format+'</td><td>'+fmt(g.size)+'</td><td>'+partsCell+'</td><td><span class="tag '+(g.hasCover?'ok':'bad')+'">'+(g.hasCover?'متوفر':'ناقص')+'</span></td><td><span class="tag '+(g.hasIcon?'ok':'bad')+'">'+(g.hasIcon?'متوفر':'ناقص')+'</span></td><td><button class="row-action" data-game="'+esc(g.gameId)+'">تفاصيل</button></td></tr>';
+ }).join(''):'<tr><td colspan="9" class="empty">لا توجد نتائج.</td></tr>';
 }
 async function fetchArt(id){if(S.offline){for(const n of [id+".jpg",id+".png",id+"_COV.jpg",id+"_COV.png",id.replace("_","-")+".jpg"]){try{return await(await S.offline.getFileHandle(n)).getFile();}catch(e){}}}for(const url of coverUrls(id)){try{const r=await fetch(url);if(r.ok&&r.headers.get("content-type")?.startsWith("image/"))return await r.blob();}catch(e){}}return null;}
 async function save(dir,name,blob){const w=await(await dir.getFileHandle(name,{create:true})).createWritable();await w.write(blob);await w.close();}
