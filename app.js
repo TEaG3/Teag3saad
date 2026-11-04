@@ -29,7 +29,7 @@ async function scanFolder(root,name){
    try{
     const f=await e.getFile(),isIso=/\.iso$/i.test(e.name);
     const id=isIso?await gameId(f):idFromName(e.name);
-    out.push({title:e.name.replace(/\.(iso|zso)$/i,""),gameId:id||localKey("FILE",name+"/"+e.name.toLowerCase()),oplGameId:id||null,format:isIso?"ISO":"ZSO",size:f.size,hasCover:false,hasIcon:false,source:name+"/"+e.name});
+    out.push({title:e.name.replace(/\.(iso|zso)$/i,""),recordKey:localKey("LIB",name+"/"+e.name.toLowerCase()),gameId:id||localKey("FILE",name+"/"+e.name.toLowerCase()),oplGameId:id||null,format:isIso?"ISO":"ZSO",size:f.size,hasCover:false,hasIcon:false,source:name+"/"+e.name});
    }catch(err){log("تعذر قراءة "+e.name);}
   }
  }catch(e){}
@@ -62,7 +62,7 @@ async function parseUl(root,h){
   }
   availableParts.sort((x,y)=>x-y);
   const complete=parts>0&&availableParts.length===parts&&availableParts.every((n,i)=>n===i);
-  out.push({title:name,gameId:key,oplGameId:fullId||null,format:'UL',size,hasCover:false,hasIcon:false,source:'ul.cfg',ulStartup:startup,ulCrc:crc,ulParts:parts,ulAvailableParts:availableParts.length,ulMissingParts:Math.max(0,parts-availableParts.length),ulPartsComplete:complete,ulPartNumbers:availableParts,ulMedia:media===0x12?'CD':media===0x14?'DVD':'UNKNOWN'});
+  out.push({recordKey:localKey("LIB","UL|"+startup+"|"+name+"|"+index),title:name,gameId:key,oplGameId:fullId||null,format:'UL',size,hasCover:false,hasIcon:false,source:'ul.cfg',ulStartup:startup,ulCrc:crc,ulParts:parts,ulAvailableParts:availableParts.length,ulMissingParts:Math.max(0,parts-availableParts.length),ulPartsComplete:complete,ulPartNumbers:availableParts,ulMedia:media===0x12?'CD':media===0x14?'DVD':'UNKNOWN'});
  }
  return out;
 }
@@ -80,10 +80,11 @@ async function scan(){
  try{
   S.root=await showDirectoryPicker({mode:"readwrite"});
   $("driveName").textContent=S.root.name;$("driveDot").classList.add("on");$("driveInfo").textContent="تم اختيار مجلد التخزين";
-  $("games").innerHTML='<tr><td colspan="8" class="empty">جارٍ الفحص...</td></tr>';
+  $("games").innerHTML='<tr><td colspan="9" class="empty">جارٍ الفحص...</td></tr>';
   S.games=[...(await scanFolder(S.root,"DVD")),...(await scanFolder(S.root,"CD"))];
   try{S.games.push(...await parseUl(S.root,await S.root.getFileHandle("ul.cfg")));}catch(e){}
-  await hydrateMetadata();await inspect();render();
+  await hydrateMetadata();await inspect();try{await saveLibrary(S.games);}catch(dbError){log("تعذر حفظ فهرس الألعاب محلياً: "+dbError.message);}render();
+restoreLastScan();
   const unknownUl=S.games.filter(g=>g.format==="UL"&&!effectiveId(g)).length;
   const incompleteUl=S.games.filter(g=>g.format==="UL"&&!g.ulPartsComplete).length;
   log("اكتمل الفحص: "+S.games.length+" لعبة. ألعاب UL غير المكتملة: "+incompleteUl+".");
@@ -144,7 +145,7 @@ async function download(onlyMissing){
    g.hasCover=true;g.hasIcon=true;ok++;
   }catch(e){fail++;log("تعذر تجهيز صور "+id+": "+e.message);}
  }
- render();log("اكتمل تحميل الصور داخل ART. نجاح "+ok+"، تعذر "+fail+".");
+ try{await saveLibrary(S.games);}catch(e){log("تعذر تحديث فهرس المكتبة المحفوظ: "+e.message);}render();log("اكتمل تحميل الصور داخل ART. نجاح "+ok+"، تعذر "+fail+".");
  $("progressText").textContent="اكتملت العملية";$("progressDetail").textContent="نجح "+ok+" · تعذر "+fail;
  msg("انتهى التحميل: "+ok+" ناجح، "+fail+" غير متاح.");
 }
@@ -161,9 +162,12 @@ $("scan").onclick=scan;$("rescan").onclick=scan;$("csv").onclick=csv;$("missing"
 $("offline").onclick=async()=>{if(!("showDirectoryPicker"in window)){msg("اختيار المجلد غير مدعوم في هذا المتصفح.",true);return;}try{S.offline=await showDirectoryPicker({mode:"read"});$("offlineName").textContent=S.offline.name;msg("تم اختيار مجلد الصور.");}catch(e){}};
 if("serviceWorker"in navigator&&location.protocol.startsWith("http"))navigator.serviceWorker.register("./sw.js").catch(()=>{});
 
-function openDb(){return new Promise((resolve,reject)=>{const req=indexedDB.open("saad-ps2-db",1);req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains("games"))req.result.createObjectStore("games",{keyPath:"gameId"});};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});}
+function openDb(){return new Promise((resolve,reject)=>{const req=indexedDB.open("saad-ps2-db",2);req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains("games"))db.createObjectStore("games",{keyPath:"gameId"});if(!db.objectStoreNames.contains("library"))db.createObjectStore("library",{keyPath:"recordKey"});};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);req.onblocked=()=>reject(new Error("أغلق النسخ القديمة من الموقع لإكمال تحديث قاعدة البيانات."));});}
 async function getDb(){if(!S.db)S.db=await openDb();return S.db;}
 async function allMetadata(){const d=await getDb();return new Promise((resolve,reject)=>{const r=d.transaction("games","readonly").objectStore("games").getAll();r.onsuccess=()=>resolve(r.result||[]);r.onerror=()=>reject(r.error);});}
+async function allLibrary(){const d=await getDb();return new Promise((resolve,reject)=>{const r=d.transaction("library","readonly").objectStore("library").getAll();r.onsuccess=()=>resolve(r.result||[]);r.onerror=()=>reject(r.error);});}
+async function saveLibrary(rows){const d=await getDb();return new Promise((resolve,reject)=>{const tx=d.transaction("library","readwrite"),store=tx.objectStore("library");store.clear();for(const game of rows){const row={...game};delete row.meta;store.put(row);}tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||new Error("تم إلغاء حفظ المكتبة."));});}
+async function restoreLastScan(){try{const rows=await allLibrary();if(!rows.length)return;S.games=rows;await hydrateMetadata();render();$("driveName").textContent="آخر مكتبة محفوظة";$("driveInfo").textContent=rows.length+" لعبة محفوظة محلياً؛ أعد اختيار USB لتحديث الصور";log("تم استعادة آخر فهرس ألعاب محفوظ من قاعدة البيانات المحلية.");}catch(e){log("تعذر استعادة فهرس الألعاب: "+e.message);}}
 async function putMetadata(v){const d=await getDb();return new Promise((resolve,reject)=>{const tx=d.transaction("games","readwrite");tx.objectStore("games").put(v);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});}
 async function removeMetadata(id){const d=await getDb();return new Promise((resolve,reject)=>{const tx=d.transaction("games","readwrite");tx.objectStore("games").delete(id);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});}
 async function hydrateMetadata(){
@@ -191,7 +195,7 @@ async function saveGameMeta(){
  try{await putMetadata(row);g.meta=row;g.oplGameId=row.oplGameId||(valid(g.gameId)?g.gameId:null);await inspect();$("gameDialog").hidden=true;render();log("حُفظت بيانات "+g.gameId+" محلياً.");msg("تم حفظ بيانات اللعبة.");}
  catch(e){msg("فشل الحفظ: "+e.message,true);}
 }
-async function backupDb(){try{const payload={app:"Saad PS2 Ultimate",schema:1,exportedAt:new Date().toISOString(),games:await allMetadata()},url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:"application/json"})),a=document.createElement("a");a.href=url;a.download="saad-ps2-database-backup.json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1200);msg("تم إنشاء النسخة الاحتياطية.");}catch(e){msg("تعذر إنشاء النسخة: "+e.message,true);}}
+async function backupDb(){try{const payload={app:"Saad PS2 Ultimate",schema:2,exportedAt:new Date().toISOString(),games:await allMetadata(),library:await allLibrary()},url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:"application/json"})),a=document.createElement("a");a.href=url;a.download="saad-ps2-database-backup.json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1200);msg("تم إنشاء النسخة الاحتياطية.");}catch(e){msg("تعذر إنشاء النسخة: "+e.message,true);}}
 async function restoreDb(file){
  try{
   const data=JSON.parse(await file.text());
@@ -203,7 +207,20 @@ async function restoreDb(file){
    await putMetadata({gameId:v.gameId,oplGameId,title:String(v.title||"").slice(0,120),genre:String(v.genre||"").slice(0,60),region:String(v.region||"").slice(0,30),year:String(v.year||"").slice(0,4),rating:String(v.rating||"").slice(0,4),notes:String(v.notes||"").slice(0,1000),updatedAt:v.updatedAt||new Date().toISOString()});
    count++;
   }
-  await hydrateMetadata();await inspect();render();log("تم استيراد "+count+" سجل.");msg("تم استيراد "+count+" سجل.");
+  if(Array.isArray(data.library)){
+   const inventory=[];
+   for(const v of data.library){
+    if(!v||!["ISO","ZSO","UL"].includes(v.format))continue;
+    const source=String(v.source||v.title||"restored");
+    const gameId=validRecordKey(v.gameId)?v.gameId:localKey("FILE",source);
+    const recordKey=/^LIB_[A-F0-9]{8}$/.test(String(v.recordKey||""))?v.recordKey:localKey("LIB",source+"|"+gameId);
+    inventory.push({recordKey,gameId,oplGameId:valid(v.oplGameId)?String(v.oplGameId).toUpperCase().replace("-","_"):(valid(gameId)?gameId:null),title:String(v.title||"").slice(0,180),format:v.format,size:Number.isFinite(Number(v.size))?Math.max(0,Number(v.size)):0,source,hasCover:!!v.hasCover,hasIcon:!!v.hasIcon,ulStartup:String(v.ulStartup||"").slice(0,12),ulParts:Number(v.ulParts)||0,ulAvailableParts:Number(v.ulAvailableParts)||0,ulMissingParts:Number(v.ulMissingParts)||0,ulPartsComplete:!!v.ulPartsComplete,ulPartNumbers:Array.isArray(v.ulPartNumbers)?v.ulPartNumbers.filter(n=>Number.isInteger(n)&&n>=0&&n<256):[],ulMedia:String(v.ulMedia||"UNKNOWN")});
+   }
+   await saveLibrary(inventory);S.games=inventory;
+  }
+  await hydrateMetadata();if(S.root)await inspect();render();
+  if(!S.root&&S.games.length){$("driveName").textContent="مكتبة مستعادة";$("driveInfo").textContent=S.games.length+" لعبة؛ اختر USB لتحديث بياناته";}
+  log("تم استيراد "+count+" سجل بيانات و"+S.games.length+" لعبة في الفهرس.");msg("تم استيراد "+count+" سجل بيانات و"+S.games.length+" لعبة.");
  }catch(e){msg("تعذر استيراد النسخة: "+e.message,true);}
 }
 document.addEventListener("click",e=>{const b=e.target.closest("[data-game]");if(b)showGame(b.dataset.game);});
