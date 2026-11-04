@@ -61,12 +61,14 @@ async function parseUl(root,h){
    }
   }
   availableParts.sort((x,y)=>x-y);
-  const complete=parts>0&&availableParts.length===parts&&availableParts.every((n,i)=>n===i);
-  out.push({recordKey:localKey("LIB","UL|"+startup+"|"+name+"|"+index),title:name,gameId:key,oplGameId:fullId||null,format:'UL',size,hasCover:false,hasIcon:false,source:'ul.cfg',ulStartup:startup,ulCrc:crc,ulParts:parts,ulAvailableParts:availableParts.length,ulMissingParts:Math.max(0,parts-availableParts.length),ulPartsComplete:complete,ulPartNumbers:availableParts,ulMedia:media===0x12?'CD':media===0x14?'DVD':'UNKNOWN'});
+  const missingPartNumbers=[];for(let part=0;part<parts;part++)if(!seen.has(part))missingPartNumbers.push(part);
+  const complete=parts>0&&missingPartNumbers.length===0&&availableParts.length===parts;
+  out.push({recordKey:localKey("LIB","UL|"+startup+"|"+name+"|"+index),title:name,gameId:key,oplGameId:fullId||null,format:'UL',size,hasCover:false,hasIcon:false,source:'ul.cfg',ulStartup:startup,ulCrc:crc,ulParts:parts,ulAvailableParts:availableParts.length,ulMissingParts:missingPartNumbers.length,ulMissingPartNumbers:missingPartNumbers,ulPartsComplete:complete,ulPartNumbers:availableParts,ulMedia:media===0x12?'CD':media===0x14?'DVD':'UNKNOWN'});
  }
  return out;
 }
 async function inspect(){
+ if(!S.root)return;
  const artNames=new Set();
  try{for await(const e of (await S.root.getDirectoryHandle("ART")).values())if(e.kind==="file")artNames.add(e.name.toUpperCase());}catch(e){}
  S.games.forEach(g=>{
