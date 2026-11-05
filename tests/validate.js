@@ -206,10 +206,8 @@ assert.equal(resolverSandbox.resolvePlatform("SCUS_949.00","CUE"),"UNKNOWN","amb
 assert.equal(resolverSandbox.resolvePlatform("SLPS_200.15","ISO","Tekken Tag Tournament"),"PS2","unique PS2 catalog serial must remain PS2");
 
 assert(desktopPackage.version==="1.1.3","desktop release version mismatch");
-assert(desktopPackage.devDependencies.electron==="22.3.27","legacy Windows runtime version mismatch");
+assert(desktopPackage.devDependencies.electron==="45.2.3","maintained Electron runtime version mismatch");
 assert(desktopPackage.devDependencies["electron-builder"]==="26.18.1","electron-builder version mismatch");
-assert(desktopMain.includes("protocol.registerFileProtocol")&&!desktopMain.includes("protocol.handle("),"legacy Electron file protocol API missing");
-assert(desktopMain.includes("fetchArtworkResponse")&&!desktopMain.includes("net.fetch("),"legacy Electron HTTPS downloader missing");
 assert(app.includes("تعذر حفظ الصور على الفلاش. أعد توصيله وتحقق من سلامته ثم حاول مجدداً."),"USB failure notification should be short and clear");
 assert(!/Windows 7|Windows 8|Windows 10|Windows 11|متطلبات التشغيل/.test(downloadPage),"download page should not list supported operating systems");
 assert(desktopMain.includes("protocol.registerFileProtocol")&&!desktopMain.includes("protocol.handle("),"legacy Electron file protocol API missing");
