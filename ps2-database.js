@@ -46,30 +46,33 @@
   return {total:list.length,identified:[...list].filter(g=>normalizeGameId(g.oplGameId||g.gameId)).length,missingId:list.filter(g=>!normalizeGameId(g.oplGameId||g.gameId)).length,duplicateIds:[...byId].filter(([,v])=>v.length>1).length,incompleteUl:list.filter(g=>g.format==="UL"&&!g.ulPartsComplete).length,issues,regions:list.reduce((o,g)=>{const r=regionFromId(g.oplGameId||g.gameId);o[r.code]=(o[r.code]||0)+1;return o;},{})};
  }
  async function inspectArt(root){
-  const report={files:0,covers:0,icons:0,valid:[],invalid:[],missing:[]};
-  let art;try{art=await root.getDirectoryHandle("ART");}catch(e){return {...report,missing:["مجلد ART غير موجود"]};}
-  const map=new Map();
-  for await(const entry of art.values()){
-   if(entry.kind!=="file")continue;
-   const name=entry.name.toUpperCase();report.files++;map.set(name,entry);
+  const report={files:0,covers:0,icons:0,legacyIcons:0,valid:[],invalid:[],missing:[]};
+  const folders=[];
+  for(const folderName of ["ART","ICONS"]){
+   try{folders.push({name:folderName,handle:await root.getDirectoryHandle(folderName)});}
+   catch(e){report.missing.push("مجلد "+folderName+" غير موجود");}
   }
-  for(const [name,entry] of map){
-   const isCover=/_COV\.(JPG|PNG)$/i.test(name);
-   const isIcon=/_ICO\.PNG$/i.test(name);
-   if(!isCover&&!isIcon)continue;
-   try{
-    const file=await entry.getFile();
-    if(!file.size)throw new Error("ملف فارغ");
-    const bitmap=await createImageBitmap(file);
-    const expected=isCover?[140,200]:[64,64];
-    const dimensions=bitmap.width===expected[0]&&bitmap.height===expected[1];
-    const actual=bitmap.width+"×"+bitmap.height;
-    bitmap.close();
-    if(!dimensions){report.invalid.push({name,actual,expected:expected.join("×")});continue;}
-    report.valid.push(name);
-    if(isCover)report.covers++;
-    if(isIcon)report.icons++;
-   }catch(e){report.invalid.push({name,actual:e.message||"ملف صورة غير قابل للقراءة",expected:isCover?"140×200":"64×64"});}
+  for(const folder of folders){
+   for await(const entry of folder.handle.values()){
+    if(entry.kind!=="file")continue;
+    const name=entry.name.toUpperCase();report.files++;
+    const isCover=folder.name==="ART"&&/_COV\.(JPG|PNG)$/i.test(name);
+    const isIcon=folder.name==="ICONS"&&/_ICO\.PNG$/i.test(name);
+    if(folder.name==="ART"&&/_ICO\.PNG$/i.test(name)){report.legacyIcons++;continue;}
+    if(!isCover&&!isIcon)continue;
+    try{
+     const file=await entry.getFile();
+     if(!file.size)throw new Error("ملف فارغ");
+     const bitmap=await createImageBitmap(file);
+     const expected=isCover?[140,200]:[64,64],actual=bitmap.width+"×"+bitmap.height;
+     const dimensions=bitmap.width===expected[0]&&bitmap.height===expected[1];
+     bitmap.close();
+     if(!dimensions){report.invalid.push({name:folder.name+"/"+name,actual,expected:expected.join("×")});continue;}
+     report.valid.push(folder.name+"/"+name);
+     if(isCover)report.covers++;
+     if(isIcon)report.icons++;
+    }catch(e){report.invalid.push({name:folder.name+"/"+name,actual:e.message||"ملف صورة غير قابل للقراءة",expected:isCover?"140×200":"64×64"});}
+   }
   }
   return report;
  }

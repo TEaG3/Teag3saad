@@ -90,8 +90,8 @@ async function inspect(){
  const verified=new Set((report.valid||[]).map(name=>String(name).toUpperCase()));
  S.games.forEach(g=>{
   const id=effectiveId(g);
-  g.hasCover=!!id&&(verified.has(id+"_COV.JPG")||verified.has(id+"_COV.PNG"));
-  g.hasIcon=!!id&&verified.has(id+"_ICO.PNG");
+  g.hasCover=!!id&&(verified.has("ART/"+id+"_COV.JPG")||verified.has("ART/"+id+"_COV.PNG"));
+  g.hasIcon=!!id&&verified.has("ICONS/"+id+"_ICO.PNG");
  });
  S.artReport=report;
  return report;
@@ -270,7 +270,7 @@ async function scanSelectedFiles(fileList){
 function render(){
  const iso=S.games.filter(g=>g.format==='ISO').length,zso=S.games.filter(g=>g.format==='ZSO').length,ul=S.games.filter(g=>g.format==='UL').length,cov=S.games.filter(g=>g.hasCover).length;
  const miss=S.games.filter(g=>!effectiveId(g)||!g.hasCover||!g.hasIcon).length;
- $('total').textContent=S.games.length;$('iso').textContent=iso+zso;$('ul').textContent=ul;$('covers').textContent=cov;if($('ps1Count'))$('ps1Count').textContent=S.games.filter(g=>g.platform==='PS1').length;
+ $('total').textContent=S.games.length;$('iso').textContent=iso+zso;$('ul').textContent=S.games.filter(g=>g.platform==='PS2').length;$('covers').textContent=cov;if($('ps1Count'))$('ps1Count').textContent=S.games.filter(g=>g.platform==='PS1').length;
  $('allCount').textContent=S.games.length;$('missingCount').textContent=miss;
  $('sGames').textContent=S.games.length;$('sIso').textContent=iso+zso;$('sUl').textContent=ul;$('sSize').textContent=fmt(S.games.reduce((a,g)=>a+g.size,0));
  $('csv').disabled=!S.games.length;$('rescan').disabled=!S.root;$('missing').disabled=!S.games.length;$('all').disabled=!S.games.length;if($('downloadToApp'))$('downloadToApp').disabled=!S.games.length||!S.root;
@@ -323,7 +323,7 @@ async function restoreCachedArtwork(){
 async function downloadArtworkToApp(){
  if(!S.root){msg("اختر وحدة USB أولاً؛ سيتم الحفظ داخل ART ليقرأها OPL.",true);return;}
  // The native Windows downloader caches the original online cover.
- // download(false) then creates and verifies OPL _COV/_ICO files on USB:/ART.
+ // download(false) then creates and verifies cover files in ART and icons in ICONS.
  await download(false);
 }
 async function ensureWritePermission(){
@@ -339,6 +339,24 @@ async function save(dir,name,blob){
  const writer=await handle.createWritable({keepExistingData:false});
  try{await writer.write(blob);await writer.close();}
  catch(error){try{await writer.abort();}catch(e){}throw error;}
+}
+async function verifyUsbWriteAccess(){
+ const token=new Uint8Array(8);crypto.getRandomValues(token);
+ const name=".__saad_write_check_"+Array.from(token,x=>x.toString(16).padStart(2,"0")).join("")+".tmp";
+ let handle;
+ try{
+  handle=await S.root.getFileHandle(name,{create:true});
+  const payload=crypto.getRandomValues(new Uint8Array(65536));
+  const writer=await handle.createWritable({keepExistingData:false});
+  try{await writer.write(payload);await writer.close();}catch(error){try{await writer.abort();}catch(e){}throw error;}
+  const saved=await handle.getFile(),readback=new Uint8Array(await saved.arrayBuffer());
+  if(readback.length!==payload.length)throw new Error("حجم اختبار الكتابة غير مطابق.");
+  for(let i=0;i<payload.length;i++)if(payload[i]!==readback[i])throw new Error("فشل التحقق من بيانات USB عند الموضع "+i+".");
+  await S.root.removeEntry(name);return true;
+ }catch(error){
+  if(handle){try{await S.root.removeEntry(name);}catch(e){}}
+  throw new Error("تعذرت الكتابة على الفلاش. تحقق من صلاحية الكتابة وأن Windows تعرّف على exFAT، ثم أعد اختيار الوحدة. التفاصيل: "+(error.message||error));
+ }
 }
 async function verifySavedArt(dir,name,width,height){
  const file=await(await dir.getFileHandle(name)).getFile();
@@ -372,45 +390,55 @@ async function toJpeg(blob){return convertArt(blob,"image/jpeg",140,200,false);}
 async function toPng(blob){return convertArt(blob,"image/png",64,64,true);}
 async function download(onlyMissing){
  if(!S.root){msg("اختر وحدة التخزين أولاً.",true);return;}
- try{await ensureWritePermission();}catch(e){msg("تعذرت صلاحية الكتابة: "+e.message,true);return;}
  const list=S.games.filter(g=>valid(effectiveId(g))&&!!artworkIdentity(effectiveId(g),g.platform||g.catalog?.platform)&&(!onlyMissing||!g.hasCover||!g.hasIcon));
- if(!list.length){msg("لا توجد صور قابلة للحفظ. لألعاب UL أدخل Game ID الصحيح من تفاصيل اللعبة أولاً.",true);return;}
- const art=await S.root.getDirectoryHandle("ART",{create:true});
+ if(!list.length){msg("لا توجد صور قابلة للحفظ. تحقق من Game ID أولاً.",true);return;}
  $("progress").hidden=false;
  let ok=0,partial=0,fail=0,verifiedCovers=0,verifiedIcons=0;
- for(let i=0;i<list.length;i++){
-  const g=list[i],id=effectiveId(g);
-  $("progressText").textContent="تنزيل وحفظ والتحقق: "+g.title;
-  $("progressCount").textContent=(i+1)+" / "+list.length;
-  $("progressBar").style.width=((i+1)/list.length*100)+"%";
-  $("progressDetail").textContent="Game ID: "+id;
-  let coverOk=false,iconOk=false;
-  try{
-   const blob=await fetchArt(id,g.platform||g.catalog?.platform);
-   if(!blob)throw new Error("مصدر الغلاف لم يرجع صورة قابلة للتنزيل.");
-   const cover=await toJpeg(blob),icon=await toPng(blob);
-   const coverName=id+"_COV.jpg",iconName=id+"_ICO.png";
-   await save(art,coverName,cover);
-   await verifySavedArt(art,coverName,140,200);
-   coverOk=true;verifiedCovers++;
-   await save(art,iconName,icon);
-   await verifySavedArt(art,iconName,64,64);
-   iconOk=true;verifiedIcons++;
-   if(coverOk&&iconOk)ok++;
-   else partial++;
-  }catch(e){
-   if(coverOk||iconOk)partial++;else fail++;
-   log("فشل التحقق من صور "+id+": "+e.message);
+ try{
+  await ensureWritePermission();
+  $("progressText").textContent="اختبار الكتابة على الفلاش...";
+  $("progressDetail").textContent="اختبار آمن قبل تنزيل الصور؛ لا يحذف ملفاتك.";
+  await verifyUsbWriteAccess();
+  const art=await S.root.getDirectoryHandle("ART",{create:true});
+  const icons=await S.root.getDirectoryHandle("ICONS",{create:true});
+  for(let i=0;i<list.length;i++){
+   const g=list[i],id=effectiveId(g);
+   $("progressText").textContent="تنزيل وحفظ: "+(g.meta?.title||g.title);
+   $("progressCount").textContent=(i+1)+" / "+list.length;
+   $("progressBar").style.width=((i+1)/list.length*100)+"%";
+   $("progressDetail").textContent="Game ID: "+id+" · الغلاف ART · الأيقونة ICONS";
+   let coverOk=false,iconOk=false;
+   try{
+    const blob=await fetchArt(id,g.platform||g.catalog?.platform);
+    if(!blob)throw new Error("مصدر الغلاف لم يرجع صورة قابلة للتنزيل.");
+    const cover=await toJpeg(blob),icon=await toPng(blob);
+    const coverName=id+"_COV.jpg",iconName=id+"_ICO.png";
+    await save(art,coverName,cover);
+    await verifySavedArt(art,coverName,140,200);
+    coverOk=true;verifiedCovers++;
+    await save(icons,iconName,icon);
+    await verifySavedArt(icons,iconName,64,64);
+    iconOk=true;verifiedIcons++;
+    if(coverOk&&iconOk)ok++;else partial++;
+   }catch(e){
+    if(coverOk||iconOk)partial++;else fail++;
+    log("فشل حفظ صور "+id+": "+e.message);
+   }
   }
+  try{await inspect();}catch(e){log("تعذر إعادة فحص الصور: "+e.message);}
+  try{await saveLibrary(S.games);}catch(e){log("تعذر تحديث فهرس المكتبة: "+e.message);}
+  render();
+  const summary="انتهى التنزيل والتحقق. مكتملة: "+ok+"، جزئية: "+partial+"، فاشلة: "+fail+"، أغلفة: "+verifiedCovers+"، أيقونات: "+verifiedIcons+".";
+  log(summary);
+  $("progressText").textContent="اكتمل التنزيل والتحقق";
+  $("progressDetail").textContent="ART للأغلفة · ICONS للأيقونات. أُعيد فتح كل ملف والتحقق من أبعاده.";
+  msg(summary);
+ }catch(e){
+  $("progressText").textContent="تعذر الحفظ على وحدة التخزين";
+  $("progressDetail").textContent=e.message||String(e);
+  log("توقف تنزيل الصور: "+(e.message||e));
+  msg("فشل اختبار/صلاحية الكتابة على USB: "+(e.message||e),true);
  }
- try{await inspect();}catch(e){log("تعذر إعادة فحص ملفات ART بعد الحفظ: "+e.message);}
- try{await saveLibrary(S.games);}catch(e){log("تعذر تحديث فهرس المكتبة المحفوظ: "+e.message);}
- render();
- const summary="اكتمل تنزيل الصور والتحقق بعد إعادة قراءتها. ألعاب مكتملة: "+ok+"، جزئية: "+partial+"، فاشلة: "+fail+"، أغلفة تحققت: "+verifiedCovers+"، أيقونات تحققت: "+verifiedIcons+".";
- log(summary);
- $("progressText").textContent="اكتمل التنزيل والتحقق";
- $("progressDetail").textContent="مكتملة "+ok+" · جزئية "+partial+" · فاشلة "+fail+" — تم فتح الملفات المحفوظة وقراءة الصورة والتحقق من أبعادها.";
- msg("اكتمل التحقق: "+ok+" لعبة بصورها كاملة، "+partial+" جزئية، "+fail+" فاشلة.");
 }
 function csv(){
  const rows=[["Title","Game ID","Format","Size Bytes","Cover","Icon"],...S.games.map(g=>[g.meta?.title||g.title,effectiveId(g)||g.gameId,g.format,g.size,g.hasCover,g.hasIcon])];
@@ -559,7 +587,7 @@ async function runDiagnostics(){
  const report=window.PS2Database.inspectLibrary(S.games);
  let art={files:0,covers:0,icons:0,valid:[],invalid:[],missing:[]};
  if(S.root){try{art=await window.PS2Database.inspectArt(S.root);}catch(e){art.missing.push("تعذر فحص ART: "+e.message);}}
- const lines=["عدد سجلات الألعاب: "+report.total,"سجلات بمعرّف صالح: "+report.identified,"سجلات بلا Game ID: "+report.missingId,"معرّفات مكررة: "+report.duplicateIds,"ألعاب UL غير المكتملة: "+report.incompleteUl,"كل ملفات ART: "+art.files,"أغلفة تم فتحها والتحقق من أبعادها (140×200): "+art.covers,"أيقونات تم فتحها والتحقق من أبعادها (64×64): "+art.icons,"صور تالفة أو بأبعاد غير مطابقة: "+art.invalid.length];
+ const lines=["عدد الألعاب: "+report.total,"ألعاب بمعرّف صالح: "+report.identified,"أغلفة ART السليمة (140×200): "+art.covers,"أيقونات ICONS السليمة (64×64): "+art.icons,"أيقونات قديمة داخل ART: "+(art.legacyIcons||0),"صور تالفة: "+art.invalid.length];
  if(art.missing.length)lines.push(...art.missing);
  if(art.invalid.length)lines.push(...art.invalid.slice(0,30).map(x=>x.name+": "+x.actual+" (المطلوب "+x.expected+")"));
  if(report.issues.length)lines.push(...report.issues.slice(0,50).map(x=>x.title+": "+x.message));
