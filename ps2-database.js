@@ -15,6 +15,13 @@
   if(["SCAJ","SLAJ"].includes(p))return {code:"ASIA",label:"Asia",confidence:"medium"};
   return {code:"UNKNOWN",label:"غير محددة",confidence:"none"};
  }
+ function classifyPlatform(serial,format){
+  const id=String(serial||"").trim().toUpperCase();
+  if(/^[A-Z]{4}-\\d{5}$/.test(id.replace(/_/g,"-")))return "PS1";
+  if(/^[A-Z]{4}_\\d{3}\\.\\d{2}$/.test(id.replace(/-/g,"_")))return "PS2";
+  const ext=String(format||"").toUpperCase();
+  return ["ISO","ZSO","UL"].includes(ext)?"PS2":"UNKNOWN";
+ }
  function inspectLibrary(games){
   const list=Array.isArray(games)?games:[];
   const byId=new Map(),bySource=new Map(),issues=[];
@@ -60,5 +67,5 @@
   const ios=/iPad|iPhone|iPod/.test(ua)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
   return {picker,write:picker&&secure,secure,ios,mode:picker&&secure?"direct":"limited",message:!secure?"يلزم HTTPS أو localhost للوصول المباشر إلى المجلدات.":picker?"يمكن للموقع القراءة والكتابة على وحدة مركّبة يتعرف عليها نظام التشغيل بعد منح الإذن؛ المتصفح لا يهيئ نظام الملفات ولا يقرأ القرص الخام.":ios?"Safari على iPad/iPhone لا يوفر هنا وصولاً عاماً مضموناً للقراءة والكتابة إلى USB.":"هذا المتصفح لا يوفر واجهة اختيار مجلد مع صلاحية الكتابة؛ يلزم متصفح متوافق أو تطبيق أصلي.",oplUsbFilesystems:"يعتمد التعرف على FAT/FAT32/exFAT على نظام التشغيل والمتصفح؛ توافق تشغيل USB داخل OPL مستقل ويتوقف على إصدار OPL وإعداداته. لا يمكن للموقع ضمان تشغيل كل نظام ملفات."};
  }
- window.PS2Database={normalizeId,regionFromId,inspectLibrary,inspectArt,storageCapabilities};
+ window.PS2Database={normalizeId,regionFromId,classifyPlatform,inspectLibrary,inspectArt,storageCapabilities};
 })();
