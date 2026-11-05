@@ -105,6 +105,7 @@ async function scan(){
   $("games").innerHTML='<tr><td colspan="9" class="empty">جارٍ فحص جميع المجلدات...</td></tr>';
   S.games=await scanGameTree(S.root,"");
   try{S.games.push(...await parseUl(S.root,await S.root.getFileHandle("ul.cfg")));}catch(e){}
+  if(S.catalogReady)await S.catalogReady;
   await hydrateMetadata();await inspect();
   try{await saveLibrary(S.games);}catch(e){log("تعذر حفظ الفهرس: "+e.message);}
   await restoreCachedArtwork();
@@ -186,6 +187,7 @@ async function scanSelectedFiles(fileList){
    }
   }catch(e){log("تعذر تحليل ul.cfg: "+e.message);}
  }
+ if(S.catalogReady)await S.catalogReady;
  await hydrateMetadata();
  try{await saveLibrary(S.games);}catch(e){log("تعذر حفظ الفهرس: "+e.message);}
  await restoreCachedArtwork();
@@ -390,6 +392,9 @@ function resolvePlatform(id,format){
   if(matches.length===1)return matches[0].platform;
   if(matches.length>1)return "UNKNOWN";
  }
+ // Dotted IDs are shared by PS1 disc boot identifiers and PS2 serials.
+ // Without a unique catalog match, never guess the console generation.
+ if(/^[A-Z]{4}[_-]\d{3}\.\d{2}$/.test(String(id||"").toUpperCase()))return "UNKNOWN";
  return window.PS2Database.classifyPlatform(id,format);
 }
 async function syncCentralCatalog(){
@@ -466,7 +471,7 @@ $("restore").onclick=()=>$("restoreFile").click();
 $("restoreFile").onchange=e=>{if(e.target.files[0])restoreDb(e.target.files[0]);e.target.value="";};
 
 render();
-syncCentralCatalog();
+S.catalogReady=syncCentralCatalog();
 function renderStorageCapabilities(){
  const c=window.PS2Database?.storageCapabilities();if(!c)return;
  const e=$("storageSupport");e.innerHTML="<b>دعم وحدات التخزين على الجهاز:</b> "+esc(c.message)+"<br><b>صلاحية الموقع:</b> "+(c.write?"قراءة وكتابة بعد موافقة المستخدم":"الوصول المباشر للكتابة غير متاح")+(c.ios?" · جهاز iPad/iPhone":"")+"<br><b>توافق OPL USB:</b> "+esc(c.oplUsbFilesystems);
