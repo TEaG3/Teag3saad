@@ -1,18 +1,17 @@
 "use strict";
 const $=id=>document.getElementById(id);
 const S={root:null,offline:null,games:[],filter:"all",query:"",logs:[],busy:false,db:null,activeGame:null};
-const coverUrls=id=>[
-"https://raw.githubusercontent.com/xlenore/ps2-covers/main/covers/default/"+id.replace("_","-")+".jpg",
-"https://raw.githubusercontent.com/xlenore/ps2-covers/main/covers/default/"+id+".jpg",
-"https://art.gametdb.com/ps2/cover/US/"+id.replace("_","-")+".jpg"];
+const isPs1Id=id=>/^[A-Z]{4}-\d{5}$/.test(String(id||"").toUpperCase().replace("_","-"));
+const normalizePs1Id=id=>String(id||"").toUpperCase().replace("_","-");
+const coverUrls=id=>isPs1Id(id)?["https://raw.githubusercontent.com/xlenore/psx-covers/main/covers/default/"+normalizePs1Id(id)+".jpg"]:["https://raw.githubusercontent.com/xlenore/ps2-covers/main/covers/default/"+id.replace("_","-")+".jpg","https://raw.githubusercontent.com/xlenore/ps2-covers/main/covers/default/"+id+".jpg","https://art.gametdb.com/ps2/cover/US/"+id.replace("_","-")+".jpg"];
 function msg(t,error=false){const e=$("toast");e.textContent=t;e.className="toast show"+(error?" error":"");clearTimeout(msg.timer);msg.timer=setTimeout(()=>e.className="toast",4000);}
 function log(t){S.logs.unshift({t,at:new Date().toLocaleString("ar-IQ")});$("logs").innerHTML=S.logs.map(x=>'<div class="log-entry">'+esc(x.t)+' <small>— '+esc(x.at)+'</small></div>').join("");}
 function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
-function valid(id){return /^[A-Z]{4}_\d{3}\.\d{2}$/.test(String(id||"").toUpperCase().replace("-","_"));}
+function valid(id){const value=String(id||"").toUpperCase();return /^[A-Z]{4}_\d{3}\.\d{2}$/.test(value.replace("-","_"))||isPs1Id(value);}
 function validRecordKey(id){return valid(id)||/^(UL|FILE)_[A-F0-9]{8}$/.test(String(id||""));}
 function localKey(prefix,value){let h=2166136261;for(const c of String(value)){h^=c.charCodeAt(0);h=Math.imul(h,16777619);}return prefix+"_"+(h>>>0).toString(16).toUpperCase().padStart(8,"0");}
-function effectiveId(g){const id=g?.oplGameId||(valid(g?.gameId)?g.gameId:"");return valid(id)?String(id).toUpperCase().replace("-","_"):"";}
-function idFromName(name){const m=String(name||"").toUpperCase().match(/\b([A-Z]{4}[_-]\d{3}\.\d{2})\b/);return m?m[1].replace("-","_"):null;}
+function effectiveId(g){const id=g?.oplGameId||(valid(g?.gameId)?g.gameId:"");if(isPs1Id(id))return normalizePs1Id(id);return valid(id)?String(id).toUpperCase().replace("-","_"):"";}
+function idFromName(name){const value=String(name||"").toUpperCase(),ps1=value.match(/\b([A-Z]{4}[-_]\d{5})\b/);if(ps1)return normalizePs1Id(ps1[1]);const m=value.match(/\b([A-Z]{4}[_-]\d{3}\.\d{2})\b/);return m?m[1].replace("-","_"):null;}
 function fmt(n){if(!n)return "—";let u=["B","KB","MB","GB"],i=0;while(n>=1024&&i<3){n/=1024;i++;}return n.toFixed(i?1:0)+" "+u[i];}
 async function gameId(file){
  if(!/\.iso$/i.test(file.name))return idFromName(file.name);
@@ -235,8 +234,8 @@ function showGame(id){
 async function saveGameMeta(){
  const g=S.activeGame;if(!g)return;
  const year=$("metaYear").value.trim(),rating=$("metaRating").value.trim();
- const oplGameId=$("metaGameId").value.trim().toUpperCase().replace("-","_");
- if(oplGameId&&!valid(oplGameId)){msg("صيغة Game ID غير صحيحة. مثال: SLUS_203.12",true);return;}
+ const rawId=$("metaGameId").value.trim().toUpperCase(),oplGameId=isPs1Id(rawId)?normalizePs1Id(rawId):rawId.replace("-","_");
+ if(oplGameId&&!valid(oplGameId)){msg("صيغة المعرّف غير صحيحة. PS2: SLUS_203.12 · PS1: SLUS-00896",true);return;}
  if(year&&!/^\d{4}$/.test(year)){msg("أدخل سنة صحيحة من أربعة أرقام.",true);return;}
  if(rating&&(!Number.isFinite(Number(rating))||Number(rating)<0||Number(rating)>10)){msg("التقييم يجب أن يكون بين 0 و10.",true);return;}
  const row={gameId:g.gameId,oplGameId:oplGameId||null,title:$("metaTitle").value.trim().slice(0,120),genre:$("metaGenre").value.trim().slice(0,60),region:$("metaRegion").value.trim().slice(0,30),year,rating,notes:$("metaNotes").value.trim().slice(0,1000),updatedAt:new Date().toISOString()};
@@ -262,7 +261,7 @@ async function restoreDb(file){
     const source=String(v.source||v.title||"restored");
     const gameId=validRecordKey(v.gameId)?v.gameId:localKey("FILE",source);
     const recordKey=/^LIB_[A-F0-9]{8}$/.test(String(v.recordKey||""))?v.recordKey:localKey("LIB",source+"|"+gameId);
-    inventory.push({recordKey,gameId,oplGameId:valid(v.oplGameId)?String(v.oplGameId).toUpperCase().replace("-","_"):(valid(gameId)?gameId:null),title:String(v.title||"").slice(0,180),format:v.format,size:Number.isFinite(Number(v.size))?Math.max(0,Number(v.size)):0,source,hasCover:!!v.hasCover,hasIcon:!!v.hasIcon,ulStartup:String(v.ulStartup||"").slice(0,12),ulParts:Number(v.ulParts)||0,ulAvailableParts:Number(v.ulAvailableParts)||0,ulMissingParts:Number(v.ulMissingParts)||0,ulPartsComplete:!!v.ulPartsComplete,ulPartNumbers:Array.isArray(v.ulPartNumbers)?v.ulPartNumbers.filter(n=>Number.isInteger(n)&&n>=0&&n<256):[],ulMedia:String(v.ulMedia||"UNKNOWN")});
+    inventory.push({recordKey,gameId,oplGameId:valid(v.oplGameId)?(isPs1Id(v.oplGameId)?normalizePs1Id(v.oplGameId):String(v.oplGameId).toUpperCase().replace("-","_")):(valid(gameId)?gameId:null),title:String(v.title||"").slice(0,180),format:v.format,size:Number.isFinite(Number(v.size))?Math.max(0,Number(v.size)):0,source,hasCover:!!v.hasCover,hasIcon:!!v.hasIcon,ulStartup:String(v.ulStartup||"").slice(0,12),ulParts:Number(v.ulParts)||0,ulAvailableParts:Number(v.ulAvailableParts)||0,ulMissingParts:Number(v.ulMissingParts)||0,ulPartsComplete:!!v.ulPartsComplete,ulPartNumbers:Array.isArray(v.ulPartNumbers)?v.ulPartNumbers.filter(n=>Number.isInteger(n)&&n>=0&&n<256):[],ulMedia:String(v.ulMedia||"UNKNOWN")});
    }
    await saveLibrary(inventory);S.games=inventory;
   }
