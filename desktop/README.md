@@ -24,3 +24,8 @@ The Windows app can retrieve PS1 and PS2 cover images by validated game serial a
 Use **تنزيل الأغلفة إلى البرنامج** to populate the app library and keep covers available after disconnecting USB. Use **تحميل الناقص إلى ART** separately to convert and copy covers/icons to an OPL USB drive. Internet cover repositories do not guarantee that every regional release has an image.
 
 The renderer receives only two narrow preload methods for artwork lookup/download. Raw IPC and Node filesystem APIs are not exposed to page scripts.
+
+
+## OPL USB artwork export
+
+Use **تنزيل الكل وحفظه في ART** after selecting the USB game device. The Windows downloader retrieves the source cover online and caches the original under the current Windows user's profile. It then writes OPL files to the USB root's `ART/` directory (not inside `CD/` or `DVD/`): `<Game_ID>_COV.jpg` at 140×200 and `<Game_ID>_ICO.png` at 64×64. Each saved file is reopened and decoded before it is counted as successful. In OPL, enable **Display Settings → Enable Cover Art** and enable the device holding the games/art. For a multi-device setup, OPL requires the ART folder on each active device. A source repository may not have artwork for every regional game release.
