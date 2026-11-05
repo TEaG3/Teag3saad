@@ -77,21 +77,57 @@ async function inspect(){
  });
 }
 async function scan(){
- if(!("showDirectoryPicker"in window)){ $("fallbackPick").hidden=false; $("fallbackFilesPick").hidden=false; msg("هذا المتصفح لا يدعم الوصول المباشر للمجلدات. اختر مجلد OPL أو ملفات الألعاب يدوياً؛ وضع الملفات المختارة للقراءة فقط."); return; }
+ if(!("showDirectoryPicker"in window)){ $("fallbackPick").hidden=false; $("fallbackFilesPick").hidden=false; msg("هذا المتصفح لا يدعم الكتابة المباشرة إلى USB. اختر الملفات يدوياً؛ تنزيل الأغلفة إلى الفلاش يتطلب متصفح Chromium يدعم اختيار المجلدات."); return; }
  try{
   S.root=await showDirectoryPicker({mode:"readwrite"});
   $("fallbackPick").hidden=true;
-  $("driveName").textContent=S.root.name;$("driveDot").classList.add("on");$("driveInfo").textContent="تم اختيار مجلد التخزين";
-  $("games").innerHTML='<tr><td colspan="9" class="empty">جارٍ الفحص...</td></tr>';
-  const dirs=[];for await(const ent of S.root.values())if(ent.kind==="directory")dirs.push(ent.name.toUpperCase());
-  S.games=[...(dirs.includes("DVD")?await scanFolder(S.root,dirs[dirs.indexOf("DVD")]):[]),...(dirs.includes("CD")?await scanFolder(S.root,dirs[dirs.indexOf("CD")]):[])];
-  for await(const ent of S.root.values()){if(ent.kind!=="file"||!/\.(iso|zso)$/i.test(ent.name))continue;try{const f=await ent.getFile(),isIso=/\.iso$/i.test(ent.name),id=isIso?await gameId(f):idFromName(ent.name);S.games.push({title:ent.name.replace(/\.(iso|zso)$/i,""),recordKey:localKey("LIB",ent.name.toLowerCase()),gameId:id||localKey("FILE",ent.name.toLowerCase()),oplGameId:id||null,format:isIso?"ISO":"ZSO",size:f.size,hasCover:false,hasIcon:false,source:ent.name});}catch(err){log("تعذر قراءة "+ent.name);}}
+  $("driveName").textContent=S.root.name;$("driveDot").classList.add("on");$("driveInfo").textContent="فحص PS1 وPS2...";
+  $("games").innerHTML='<tr><td colspan="9" class="empty">جارٍ فحص جميع المجلدات...</td></tr>';
+  S.games=await scanGameTree(S.root,"");
   try{S.games.push(...await parseUl(S.root,await S.root.getFileHandle("ul.cfg")));}catch(e){}
-  await hydrateMetadata();await inspect();try{await saveLibrary(S.games);}catch(dbError){log("تعذر حفظ فهرس الألعاب محلياً: "+dbError.message);}render();restoreLastScan();
-  const unknownUl=S.games.filter(g=>g.format==="UL"&&!effectiveId(g)).length,incompleteUl=S.games.filter(g=>g.format==="UL"&&!g.ulPartsComplete).length;
-  log("اكتمل الفحص: "+S.games.length+" لعبة. ألعاب UL غير المكتملة: "+incompleteUl+".");
-  msg("اكتمل الفحص: "+S.games.length+" لعبة."+(unknownUl?" · عيّن Game ID لألعاب UL من التفاصيل.":"")+(incompleteUl?" · تحقق من أجزاء UL الناقصة.":""));
+  await hydrateMetadata();await inspect();
+  try{await saveLibrary(S.games);}catch(e){log("تعذر حفظ الفهرس: "+e.message);}
+  render();
+  const ps1=S.games.filter(g=>g.platform==="PS1").length,ps2=S.games.filter(g=>g.platform==="PS2").length;
+  log("اكتمل الفحص: PS1 "+ps1+"، PS2 "+ps2+"، الإجمالي "+S.games.length+".");
+  msg("اكتشف الموقع "+S.games.length+" لعبة؛ بدأ تنزيل الأغلفة الناقصة.");
+  await download(true);
  }catch(e){if(e.name!=="AbortError")msg("تعذر فحص المجلد: "+e.message,true);}
+}
+async function extractDiscId(file){
+ const byName=idFromName(file.name);if(byName)return byName;
+ const ext=(file.name.split(".").pop()||"").toLowerCase();
+ if(ext==="cue"){
+  try{const text=await file.slice(0,1048576).text();const m=text.toUpperCase().match(/([A-Z]{4}[-_]\d{5})|([A-Z]{4}[_-]\d{3}\.\d{2})/);if(m)return m[1]?normalizePs1Id(m[1]):m[2].replace("-","_");}catch(e){}
+  return null;
+ }
+ if(["iso","bin","img","zso","chd","pbp"].indexOf(ext)<0)return null;
+ try{
+  const bytes=await file.slice(0,33554432).arrayBuffer(),txt=new TextDecoder("ascii").decode(bytes);
+  const ps2=txt.match(/\b([A-Z]{4}[_-]\d{3}\.\d{2})\b/i);if(ps2)return ps2[1].toUpperCase().replace("-","_");
+  const ps1=txt.match(/\b([A-Z]{4}[-_]\d{5})\b/i);if(ps1)return normalizePs1Id(ps1[1]);
+ }catch(e){}
+ return null;
+}
+async function scanGameTree(dir,prefix){
+ const out=[],entries=[];for await(const ent of dir.values())entries.push(ent);
+ const cueBases=new Set(entries.filter(e=>e.kind==="file"&&/\.cue$/i.test(e.name)).map(e=>e.name.replace(/\.cue$/i,"").toLowerCase()));
+ for(const ent of entries){
+  if(ent.kind==="directory"){
+   if(ent.name.toUpperCase()==="ART")continue;
+   out.push(...await scanGameTree(ent,prefix?prefix+"/"+ent.name:ent.name));continue;
+  }
+  if(ent.kind!=="file"||!/\.(iso|zso|bin|cue|img|chd|pbp)$/i.test(ent.name))continue;
+  const ext=ent.name.split(".").pop().toLowerCase(),base=ent.name.replace(/\.[^.]+$/,"").toLowerCase();
+  if(ext==="bin"&&cueBases.has(base))continue;
+  try{
+   const file=await ent.getFile(),id=await extractDiscId(file);
+   const platform=((id&&isPs1Id(id))||["bin","cue","img","chd","pbp"].includes(ext))?"PS1":"PS2";
+   const path=(prefix?prefix+"/":"")+ent.name;
+   out.push({title:ent.name.replace(/\.[^.]+$/,""),recordKey:localKey("LIB",path.toLowerCase()),gameId:id||localKey("FILE",path.toLowerCase()),oplGameId:id||null,format:ext.toUpperCase(),platform,size:file.size,hasCover:false,hasIcon:false,source:path});
+  }catch(e){log("تعذر قراءة "+ent.name+": "+e.message);}
+ }
+ return out;
 }
 async function scanSelectedFiles(fileList){
  const files=Array.prototype.slice.call(fileList||[]);
