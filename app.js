@@ -67,14 +67,16 @@ async function parseUl(root,h){
  return out;
 }
 async function inspect(){
- if(!S.root)return;
- const artNames=new Set();
- try{for await(const e of (await S.root.getDirectoryHandle("ART")).values())if(e.kind==="file")artNames.add(e.name.toUpperCase());}catch(e){}
+ if(!S.root)return null;
+ const report=await window.PS2Database.inspectArt(S.root);
+ const verified=new Set((report.valid||[]).map(name=>String(name).toUpperCase()));
  S.games.forEach(g=>{
   const id=effectiveId(g);
-  g.hasCover=!!id&&(artNames.has(id+"_COV.JPG")||artNames.has(id+"_COV.PNG"));
-  g.hasIcon=!!id&&artNames.has(id+"_ICO.PNG");
+  g.hasCover=!!id&&(verified.has(id+"_COV.JPG")||verified.has(id+"_COV.PNG"));
+  g.hasIcon=!!id&&verified.has(id+"_ICO.PNG");
  });
+ S.artReport=report;
+ return report;
 }
 async function scan(){
  if(!("showDirectoryPicker"in window)){ $("fallbackPick").hidden=false; $("fallbackFilesPick").hidden=false; msg("هذا المتصفح لا يدعم الكتابة المباشرة إلى USB. اختر الملفات يدوياً؛ تنزيل الأغلفة إلى الفلاش يتطلب متصفح Chromium يدعم اختيار المجلدات."); return; }
@@ -188,8 +190,47 @@ function render(){
   return '<tr><td>'+(cover?'<img class="cover" src="'+cover+'" onerror="this.style.visibility=\'hidden\'" alt="">':'—')+'</td><td>'+esc(g.meta?.title||g.title)+'</td><td class="id">'+esc(displayId)+'</td><td>'+g.format+'</td><td>'+fmt(g.size)+'</td><td>'+partsCell+'</td><td><span class="tag '+(g.hasCover?'ok':'bad')+'">'+(g.hasCover?'متوفر':'ناقص')+'</span></td><td><span class="tag '+(g.hasIcon?'ok':'bad')+'">'+(g.hasIcon?'متوفر':'ناقص')+'</span></td><td><button class="row-action" data-game="'+esc(g.gameId)+'">تفاصيل</button></td></tr>';
  }).join(''):'<tr><td colspan="9" class="empty">لا توجد نتائج.</td></tr>';
 }
-async function fetchArt(id){if(S.offline){for(const n of [id+".jpg",id+".png",id+"_COV.jpg",id+"_COV.png",id.replace("_","-")+".jpg"]){try{return await(await S.offline.getFileHandle(n)).getFile();}catch(e){}}}for(const url of coverUrls(id)){try{const r=await fetch(url);if(r.ok&&r.headers.get("content-type")?.startsWith("image/"))return await r.blob();}catch(e){}}return null;}
-async function save(dir,name,blob){const w=await(await dir.getFileHandle(name,{create:true})).createWritable();await w.write(blob);await w.close();}
+async function fetchArt(id){
+ if(S.offline){
+  for(const n of [id+".jpg",id+".png",id+"_COV.jpg",id+"_COV.png",id.replace("_","-")+".jpg"]){
+   try{const file=await(await S.offline.getFileHandle(n)).getFile();if(file.size)return file;}catch(e){}
+  }
+ }
+ for(const url of coverUrls(id)){
+  try{
+   const r=await fetch(url,{cache:"no-store"});
+   if(!r.ok)continue;
+   const type=(r.headers.get("content-type")||"").toLowerCase();
+   if(!type.startsWith("image/"))continue;
+   const blob=await r.blob();
+   if(blob.size)return blob;
+  }catch(e){}
+ }
+ return null;
+}
+async function ensureWritePermission(){
+ if(!S.root)throw new Error("لم يتم اختيار وحدة التخزين.");
+ if(typeof S.root.queryPermission==="function"){
+  let permission=await S.root.queryPermission({mode:"readwrite"});
+  if(permission!=="granted"&&typeof S.root.requestPermission==="function")permission=await S.root.requestPermission({mode:"readwrite"});
+  if(permission!=="granted")throw new Error("لم تمنح صلاحية الكتابة والقراءة.");
+ }
+}
+async function save(dir,name,blob){
+ const handle=await dir.getFileHandle(name,{create:true});
+ const writer=await handle.createWritable({keepExistingData:false});
+ try{await writer.write(blob);await writer.close();}
+ catch(error){try{await writer.abort();}catch(e){}throw error;}
+}
+async function verifySavedArt(dir,name,width,height){
+ const file=await(await dir.getFileHandle(name)).getFile();
+ if(!file.size)throw new Error(name+" ملف فارغ بعد الحفظ.");
+ const bitmap=await createImageBitmap(file);
+ const actual=bitmap.width+"×"+bitmap.height;
+ bitmap.close();
+ if(actual!==width+"×"+height)throw new Error(name+" أبعاده "+actual+" بدلاً من "+width+"×"+height+".");
+ return {size:file.size,type:file.type,dimensions:actual};
+}
 async function convertArt(blob,type,width,height,cropSquare=false){
  const bmp=await createImageBitmap(blob),canvas=document.createElement("canvas");
  canvas.width=width;canvas.height=height;
@@ -213,25 +254,45 @@ async function toJpeg(blob){return convertArt(blob,"image/jpeg",140,200,false);}
 async function toPng(blob){return convertArt(blob,"image/png",64,64,true);}
 async function download(onlyMissing){
  if(!S.root){msg("اختر وحدة التخزين أولاً.",true);return;}
- try{if(typeof S.root.queryPermission==="function"){let p=await S.root.queryPermission({mode:"readwrite"});if(p!=="granted")p=await S.root.requestPermission({mode:"readwrite"});if(p!=="granted")throw new Error("لم تمنح صلاحية الكتابة على وحدة التخزين.");}}catch(e){msg("تعذرت صلاحية الكتابة: "+e.message,true);return;}
+ try{await ensureWritePermission();}catch(e){msg("تعذرت صلاحية الكتابة: "+e.message,true);return;}
  const list=S.games.filter(g=>valid(effectiveId(g))&&(!onlyMissing||!g.hasCover||!g.hasIcon));
  if(!list.length){msg("لا توجد صور قابلة للحفظ. لألعاب UL أدخل Game ID الصحيح من تفاصيل اللعبة أولاً.",true);return;}
  const art=await S.root.getDirectoryHandle("ART",{create:true});
- $("progress").hidden=false;let ok=0,fail=0;
+ $("progress").hidden=false;
+ let ok=0,partial=0,fail=0,verifiedCovers=0,verifiedIcons=0;
  for(let i=0;i<list.length;i++){
   const g=list[i],id=effectiveId(g);
-  $("progressText").textContent="تحميل "+g.title;$("progressCount").textContent=(i+1)+" / "+list.length;
-  $("progressBar").style.width=((i+1)/list.length*100)+"%";$("progressDetail").textContent=id;
+  $("progressText").textContent="تنزيل وحفظ والتحقق: "+g.title;
+  $("progressCount").textContent=(i+1)+" / "+list.length;
+  $("progressBar").style.width=((i+1)/list.length*100)+"%";
+  $("progressDetail").textContent="Game ID: "+id;
+  let coverOk=false,iconOk=false;
   try{
-   const blob=await fetchArt(id);if(!blob){fail++;continue;}
+   const blob=await fetchArt(id);
+   if(!blob)throw new Error("مصدر الغلاف لم يرجع صورة قابلة للتنزيل.");
    const cover=await toJpeg(blob),icon=await toPng(blob);
-   await save(art,id+"_COV.jpg",cover);await save(art,id+"_ICO.png",icon);
-   g.hasCover=true;g.hasIcon=true;ok++;
-  }catch(e){fail++;log("تعذر تجهيز صور "+id+": "+e.message);}
+   const coverName=id+"_COV.jpg",iconName=id+"_ICO.png";
+   await save(art,coverName,cover);
+   await verifySavedArt(art,coverName,140,200);
+   coverOk=true;verifiedCovers++;
+   await save(art,iconName,icon);
+   await verifySavedArt(art,iconName,64,64);
+   iconOk=true;verifiedIcons++;
+   if(coverOk&&iconOk)ok++;
+   else partial++;
+  }catch(e){
+   if(coverOk||iconOk)partial++;else fail++;
+   log("فشل التحقق من صور "+id+": "+e.message);
+  }
  }
- try{await saveLibrary(S.games);}catch(e){log("تعذر تحديث فهرس المكتبة المحفوظ: "+e.message);}render();log("اكتمل تحميل الصور داخل ART. نجاح "+ok+"، تعذر "+fail+".");
- $("progressText").textContent="اكتملت العملية";$("progressDetail").textContent="نجح "+ok+" · تعذر "+fail;
- msg("انتهى التحميل: "+ok+" ناجح، "+fail+" غير متاح.");
+ try{await inspect();}catch(e){log("تعذر إعادة فحص ملفات ART بعد الحفظ: "+e.message);}
+ try{await saveLibrary(S.games);}catch(e){log("تعذر تحديث فهرس المكتبة المحفوظ: "+e.message);}
+ render();
+ const summary="اكتمل تنزيل الصور والتحقق بعد إعادة قراءتها. ألعاب مكتملة: "+ok+"، جزئية: "+partial+"، فاشلة: "+fail+"، أغلفة تحققت: "+verifiedCovers+"، أيقونات تحققت: "+verifiedIcons+".";
+ log(summary);
+ $("progressText").textContent="اكتمل التنزيل والتحقق";
+ $("progressDetail").textContent="مكتملة "+ok+" · جزئية "+partial+" · فاشلة "+fail+" — تم فتح الملفات المحفوظة وقراءة الصورة والتحقق من أبعادها.";
+ msg("اكتمل التحقق: "+ok+" لعبة بصورها كاملة، "+partial+" جزئية، "+fail+" فاشلة.");
 }
 function csv(){
  const rows=[["Title","Game ID","Format","Size Bytes","Cover","Icon"],...S.games.map(g=>[g.meta?.title||g.title,effectiveId(g)||g.gameId,g.format,g.size,g.hasCover,g.hasIcon])];
@@ -332,18 +393,64 @@ function renderStorageCapabilities(){
  const e=$("storageSupport");e.innerHTML="<b>دعم وحدات التخزين على الجهاز:</b> "+esc(c.message)+"<br><b>صلاحية الموقع:</b> "+(c.write?"قراءة وكتابة بعد موافقة المستخدم":"الوصول المباشر للكتابة غير متاح")+(c.ios?" · جهاز iPad/iPhone":"")+"<br><b>توافق OPL USB:</b> "+esc(c.oplUsbFilesystems);
 }
 async function runDiagnostics(){
- const out=$("diagnosticResults");out.hidden=false;out.textContent="جارٍ فحص المكتبة ومجلد ART...";
+ const out=$("diagnosticResults");out.hidden=false;out.textContent="جارٍ فحص محتوى ملفات ART ومكتبة الألعاب...";
  const report=window.PS2Database.inspectLibrary(S.games);
- let art={files:0,covers:0,icons:0,invalid:[],missing:[]};
+ let art={files:0,covers:0,icons:0,valid:[],invalid:[],missing:[]};
  if(S.root){try{art=await window.PS2Database.inspectArt(S.root);}catch(e){art.missing.push("تعذر فحص ART: "+e.message);}}
- const lines=["عدد السجلات: "+report.total,"سجلات بمعرّف صالح: "+report.identified,"سجلات بلا Game ID: "+report.missingId,"معرّفات مكررة: "+report.duplicateIds,"ألعاب UL غير المكتملة: "+report.incompleteUl,"ملفات ART: "+art.files+" · أغلفة: "+art.covers+" · أيقونات: "+art.icons,"صور بمقاسات خاطئة أو تالفة: "+art.invalid.length];
+ const lines=["عدد سجلات الألعاب: "+report.total,"سجلات بمعرّف صالح: "+report.identified,"سجلات بلا Game ID: "+report.missingId,"معرّفات مكررة: "+report.duplicateIds,"ألعاب UL غير المكتملة: "+report.incompleteUl,"كل ملفات ART: "+art.files,"أغلفة تم فتحها والتحقق من أبعادها (140×200): "+art.covers,"أيقونات تم فتحها والتحقق من أبعادها (64×64): "+art.icons,"صور تالفة أو بأبعاد غير مطابقة: "+art.invalid.length];
  if(art.missing.length)lines.push(...art.missing);
  if(art.invalid.length)lines.push(...art.invalid.slice(0,30).map(x=>x.name+": "+x.actual+" (المطلوب "+x.expected+")"));
  if(report.issues.length)lines.push(...report.issues.slice(0,50).map(x=>x.title+": "+x.message));
- if(!S.games.length)lines.push("لم يتم فحص وحدة تخزين بعد؛ اختر USB أولاً.");
- out.textContent=lines.join("\n");log("فحص سلامة المكتبة: "+report.issues.length+" ملاحظة، و"+art.invalid.length+" صورة تحتاج تصحيحاً.");
+ if(!S.root)lines.push("لم يتم اختيار وحدة USB؛ فحص المحتوى غير ممكن قبل اختيارها.");
+ out.textContent=lines.join("\n");
+ log("التحقق الفعلي من الصور: أغلفة سليمة "+art.covers+"، أيقونات سليمة "+art.icons+"، صور تالفة "+art.invalid.length+".");
+}
+async function testUsbDrive(){
+ const out=$("usbTestResults");
+ out.hidden=false;
+ out.textContent="جارٍ تجهيز اختبار كتابة وقراءة غير هدّام...";
+ if(!S.root){out.textContent="لم يتم اختيار وحدة USB. اختر وحدة التخزين أولاً ثم أعد الاختبار.";return;}
+ const cryptoApi=window.crypto;
+ if(!cryptoApi||typeof cryptoApi.getRandomValues!=="function"){out.textContent="هذا المتصفح لا يوفر مولد بيانات عشوائية آمناً؛ تعذر بدء الاختبار.";return;}
+ let name="",handle=null,passed=false,cleanup=true,errorMessage="",mismatch=-1;
+ const bytes=4*1024*1024,payload=new Uint8Array(bytes),started=performance.now();
+ try{
+  await ensureWritePermission();
+  const token=new Uint8Array(12);
+  cryptoApi.getRandomValues(token);
+  name=".__saad_usb_probe_"+Array.from(token,x=>x.toString(16).padStart(2,"0")).join("")+".tmp";
+  for(let offset=0;offset<payload.length;offset+=65536)cryptoApi.getRandomValues(payload.subarray(offset,Math.min(offset+65536,payload.length)));
+  handle=await S.root.getFileHandle(name,{create:true});
+  const writer=await handle.createWritable({keepExistingData:false});
+  try{await writer.write(payload);await writer.close();}
+  catch(writeError){try{await writer.abort();}catch(e){}throw writeError;}
+  const saved=await handle.getFile();
+  if(saved.size!==bytes)throw new Error("الحجم بعد الكتابة لا يطابق الحجم المرسل: "+saved.size+" / "+bytes+" بايت.");
+  const readBack=new Uint8Array(await saved.arrayBuffer());
+  if(readBack.length!==payload.length)throw new Error("حجم القراءة الراجعة غير مطابق.");
+  for(let i=0;i<payload.length;i++){if(readBack[i]!==payload[i]){mismatch=i;break;}}
+  if(mismatch!==-1)throw new Error("اختلاف بيانات عند البايت رقم "+mismatch+".");
+  passed=true;
+ }catch(e){errorMessage=e.message||String(e);}
+ finally{
+  if(name){try{await S.root.removeEntry(name);}catch(e){cleanup=false;}}
+ }
+ const elapsed=((performance.now()-started)/1000).toFixed(2);
+ const lines=[
+  "نتيجة اختبار الكتابة والقراءة: "+(passed?"نجح":"فشل"),
+  "حجم الاختبار: 4 MiB ("+bytes.toLocaleString("en-US")+" بايت)",
+  "التحقق: "+(passed?"تمت مطابقة جميع البايتات بعد إغلاق الملف وإعادة فتحه":"لم تكتمل مطابقة البيانات"),
+  "حذف ملف الاختبار المؤقت: "+(cleanup?"تم":"تعذر الحذف؛ احذف الملف "+name+" يدوياً"),
+  "المدة: "+elapsed+" ثانية"
+ ];
+ if(errorMessage)lines.push("السبب: "+errorMessage);
+ lines.push("حدود الاختبار: هذا يثبت أن مسار الكتابة والقراءة الحالي يعمل لهذا الحجم فقط؛ ولا يقيس صحة شرائح NAND أو كامل سعة الفلاش ولا يغني عن فحص قطاعات شامل.");
+ out.textContent=lines.join("\n");
+ log("اختبار USB: "+(passed?"نجح":"فشل")+"؛ تنظيف الملف المؤقت: "+(cleanup?"نجح":"تعذر")+".");
+ msg(passed?"نجح اختبار الكتابة والقراءة للفلاش.":"فشل اختبار الفلاش أو لم تكتمل الكتابة والقراءة.",!passed||!cleanup);
 }
 if($("runDiagnostics"))$("runDiagnostics").onclick=runDiagnostics;
+if($("runUsbTest"))$("runUsbTest").onclick=testUsbDrive;
 if($("fallbackPick"))$("fallbackPick").onclick=()=>$("fallbackFiles").click();
 if($("fallbackFilesPick"))$("fallbackFilesPick").onclick=()=>$("fallbackSingleFiles").click();
 if($("fallbackFiles"))$("fallbackFiles").addEventListener("change",e=>{if(e.target.files?.length)scanSelectedFiles(e.target.files);e.target.value="";});
