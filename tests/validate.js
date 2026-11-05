@@ -125,6 +125,8 @@ assert(app.includes("webkitRelativePath"),"selected-file path normalization must
 assert(app.includes("iso|zso|bin|cue"),"PS1/PS2 extension matcher missing");
 assert(app.includes("pbp|vcd"),"PS1 VCD extension matcher missing");
 assert(html.includes(".pbp,.vcd"),"VCD file picker extension missing");
+assert(html.includes('http-equiv="Content-Security-Policy"'),"application Content Security Policy missing");
+assert(html.includes("script-src 'self'")&&!html.includes("'unsafe-eval'"),"script CSP must disallow unsafe-eval");
 assert(html.includes('id="catalogStatus"'),"central catalog status missing");
 assert(app.includes("syncCentralCatalog"),"central catalog synchronization missing");
 assert(app.includes("readCatalogCache"),"offline catalog cache missing");

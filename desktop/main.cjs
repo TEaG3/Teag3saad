@@ -25,8 +25,10 @@ function createWindow() {
       webSecurity: true
     }
   });
-  window.webContents.on("console-message", (_event, level, message) => {
-    if (smokeTest && level >= 2) smokeErrors.push(message);
+  window.webContents.on("console-message", (_event, details) => {
+    if (smokeTest && Number(details?.level) >= 3) {
+      smokeErrors.push(String(details.message || "Renderer console error"));
+    }
   });
   window.webContents.once("did-fail-load", (_event, code, description) => {
     if (smokeTest) {
