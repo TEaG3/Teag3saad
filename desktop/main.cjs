@@ -1,6 +1,6 @@
 "use strict";
-const { app, BrowserWindow, shell, protocol, ipcMain } = require("electron");
-const https = require("node:https");
+const { app, BrowserWindow, shell, protocol, net, ipcMain } = require("electron");
+const { pathToFileURL } = require("node:url");
 const path = require("node:path");
 const fs = require("node:fs/promises");
 const smokeTest = process.argv.includes("--smoke-test");
@@ -89,38 +89,6 @@ function isJpeg(bytes) {
   return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
 }
 
-function fetchArtworkResponse(url, redirects = 0) {
-  return new Promise((resolve, reject) => {
-    if (redirects > 4) return reject(new Error("Too many redirects"));
-    const target = new URL(url);
-    if (target.protocol !== "https:") return reject(new Error("HTTPS required"));
-    const request = https.get(target, {
-      headers: { "User-Agent": "Saad-PS2-Ultimate/1.3", "Accept": "image/jpeg,image/*;q=0.8" },
-      timeout: 15000
-    }, (response) => {
-      const status = Number(response.statusCode || 0);
-      if ([301, 302, 303, 307, 308].includes(status) && response.headers.location) {
-        response.resume();
-        return fetchArtworkResponse(new URL(response.headers.location, target).toString(), redirects + 1).then(resolve, reject);
-      }
-      const chunks = [];
-      let size = 0;
-      response.on("data", (chunk) => {
-        size += chunk.length;
-        if (size > 10 * 1024 * 1024) {
-          request.destroy(new Error("Artwork is too large"));
-          return;
-        }
-        chunks.push(chunk);
-      });
-      response.on("end", () => resolve({ status, headers: response.headers, bytes: Buffer.concat(chunks) }));
-      response.on("error", reject);
-    });
-    request.on("timeout", () => request.destroy(new Error("Request timed out")));
-    request.on("error", reject);
-  });
-}
-
 async function readCachedArtwork(value) {
   const { platform, serial } = validateArtworkRequest(value);
   const { file } = artworkFile(platform, serial);
@@ -140,23 +108,34 @@ async function downloadArtwork(value) {
   if (cached.ok) return cached;
 
   const url = artworkUrl(platform, serial);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
   try {
-    const response = await fetchArtworkResponse(url);
-    if (response.status < 200 || response.status >= 300) {
-      return { ok: false, missing: response.status === 404, status: response.status, error: response.status === 404 ? "لا توجد صورة لهذا الرقم في قاعدة الصور." : "تعذر تنزيل صورة اللعبة." };
+    const response = await net.fetch(url, {
+      signal: controller.signal,
+      headers: { "User-Agent": "Saad-PS2-Ultimate/1.2", "Accept": "image/jpeg,image/*;q=0.8" }
+    });
+    if (!response.ok) {
+      return { ok: false, missing: response.status === 404, status: response.status, error: response.status === 404 ? "لا توجد صورة لهذا الرقم في قاعدة الصور." : "مصدر الصور أعاد HTTP " + response.status + "." };
     }
-    const contentType = String(response.headers["content-type"] || "").toLowerCase();
-    if (!contentType.startsWith("image/")) return { ok: false, error: "تعذر تنزيل صورة اللعبة." };
-    const bytes = response.bytes;
-    if (!bytes.length || bytes.length > 10 * 1024 * 1024 || !isJpeg(bytes)) return { ok: false, error: "تعذر تنزيل صورة اللعبة." };
+    const contentType = (response.headers.get("content-type") || "").toLowerCase();
+    if (!contentType.startsWith("image/")) return { ok: false, error: "مصدر الصور لم يُرجع ملف صورة." };
+    const length = Number(response.headers.get("content-length") || 0);
+    if (length > 10 * 1024 * 1024) return { ok: false, error: "حجم الغلاف يتجاوز الحد المسموح (10 MiB)." };
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (!bytes.length || bytes.length > 10 * 1024 * 1024 || !isJpeg(bytes)) {
+      return { ok: false, error: "الملف المستلم فارغ أو ليس صورة JPEG سليمة." };
+    }
     const { folder, file } = artworkFile(platform, serial);
     await fs.mkdir(folder, { recursive: true });
     const temporary = file + ".tmp";
     await fs.writeFile(temporary, bytes);
     await fs.rename(temporary, file);
     return { ok: true, platform, serial, mimeType: "image/jpeg", size: bytes.length, dataUrl: "data:image/jpeg;base64," + bytes.toString("base64"), cached: false, source: "xlenore/" + (platform === "ps1" ? "psx-covers" : "ps2-covers") };
-  } catch (_error) {
-    return { ok: false, error: "تعذر الاتصال بمصدر الصور حالياً." };
+  } catch (error) {
+    return { ok: false, error: error.name === "AbortError" ? "انتهت مهلة الاتصال بمصدر الصور." : "تعذر الاتصال بمصدر الصور: " + (error.message || String(error)) };
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -173,21 +152,20 @@ app.whenReady().then(() => {
   const siteRoot = app.isPackaged
     ? path.resolve(process.resourcesPath, "app-site")
     : path.resolve(__dirname, "app-site");
-  protocol.registerFileProtocol("app", (request, callback) => {
-    try {
-      const requestUrl = new URL(request.url);
-      if (requestUrl.hostname === "artwork") {
-        const name = path.basename(decodeURIComponent(requestUrl.pathname));
-        if (!/^(PS1|PS2)-[A-Z0-9]{4}-[0-9]{5}\\.jpg$/i.test(name)) return callback({ error: -6 });
-        return callback({ path: path.join(app.getPath("userData"), "artwork-cache", name) });
-      }
-      const pathname = decodeURIComponent(requestUrl.pathname);
-      const requested = path.resolve(siteRoot, "." + pathname);
-      if (!requested.startsWith(siteRoot + path.sep) && requested !== path.join(siteRoot, "index.html")) return callback({ error: -6 });
-      callback({ path: requested });
-    } catch (_error) {
-      callback({ error: -6 });
+  protocol.handle("app", (request) => {
+    const requestUrl = new URL(request.url);
+    if (requestUrl.hostname === "artwork") {
+      const name = path.basename(decodeURIComponent(requestUrl.pathname));
+      if (!/^(PS1|PS2)-[A-Z0-9]{4}-[0-9]{5}\.jpg$/i.test(name)) return new Response("Not found", { status: 404 });
+      const artwork = path.join(app.getPath("userData"), "artwork-cache", name);
+      return net.fetch(pathToFileURL(artwork).toString());
     }
+    const pathname = decodeURIComponent(requestUrl.pathname);
+    const requested = path.resolve(siteRoot, "." + pathname);
+    if (!requested.startsWith(siteRoot + path.sep) && requested !== path.join(siteRoot, "index.html")) {
+      return new Response("Not found", { status: 404 });
+    }
+    return net.fetch(pathToFileURL(requested).toString());
   });
   app.setAppUserModelId("com.saadps2.ultimate");
   createWindow();
