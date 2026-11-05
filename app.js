@@ -283,8 +283,10 @@ async function runDiagnostics(){
  if(!S.games.length)lines.push("لم يتم فحص وحدة تخزين بعد؛ اختر USB أولاً.");
  out.textContent=lines.join("\n");log("فحص سلامة المكتبة: "+report.issues.length+" ملاحظة، و"+art.invalid.length+" صورة تحتاج تصحيحاً.");
 }
-if($("runDiagnostics"))$("runDiagnostics").onclick=runDiagnostics;\nif($("fallbackPick"))$("fallbackPick").onclick=()=>$("fallbackFiles").click();
+if($("runDiagnostics"))$("runDiagnostics").onclick=runDiagnostics;
+if($("fallbackPick"))$("fallbackPick").onclick=()=>$("fallbackFiles").click();
 if($("fallbackFilesPick"))$("fallbackFilesPick").onclick=()=>$("fallbackSingleFiles").click();
 if($("fallbackFiles"))$("fallbackFiles").addEventListener("change",e=>{if(e.target.files?.length)scanSelectedFiles(e.target.files);e.target.value="";});
-if($("fallbackSingleFiles"))$("fallbackSingleFiles").addEventListener("change",e=>{if(e.target.files?.length)scanSelectedFiles(e.target.files);e.target.value="";});\nif($("fallbackFiles"))$("fallbackFiles").addEventListener("change",e=>{if(e.target.files?.length)scanSelectedFiles(e.target.files);e.target.value="";});
+if($("fallbackSingleFiles"))$("fallbackSingleFiles").addEventListener("change",e=>{if(e.target.files?.length)scanSelectedFiles(e.target.files);e.target.value="";});
+
 renderStorageCapabilities();
