@@ -95,15 +95,34 @@ async function scan(){
  }catch(e){if(e.name!=="AbortError")msg("تعذر فحص المجلد: "+e.message,true);}
 }
 async function scanSelectedFiles(fileList){
- const files=[...fileList];S.root=null;S.games=[];
- for(const f of files.filter(x=>/\.(iso|zso)$/i.test(x.name))){
-  try{const isIso=/\.iso$/i.test(f.name),id=isIso?await gameId(f):idFromName(f.name),path=f.webkitRelativePath||f.name;S.games.push({title:f.name.replace(/\.(iso|zso)$/i,""),recordKey:localKey("LIB",path.toLowerCase()),gameId:id||localKey("FILE",path.toLowerCase()),oplGameId:id||null,format:isIso?"ISO":"ZSO",size:f.size,hasCover:false,hasIcon:false,source:path});}catch(e){log("تعذر تحليل "+f.name);}
+ const files=[...fileList], pathOf=f=>(f.webkitRelativePath||f.name).replace(/\\\\/g,"/"), upperPath=f=>pathOf(f).toUpperCase();
+ S.root=null;S.games=[];
+ const gameFiles=files.filter(f=>/\\.(iso|zso)$/i.test(f.name));
+ for(const f of gameFiles){
+  try{
+   const path=pathOf(f),parts=path.split("/"),isIso=/\\.iso$/i.test(f.name),id=isIso?await gameId(f):idFromName(f.name);
+   S.games.push({title:f.name.replace(/\\.(iso|zso)$/i,""),recordKey:localKey("LIB",path.toLowerCase()),gameId:id||localKey("FILE",path.toLowerCase()),oplGameId:id||null,format:isIso?"ISO":"ZSO",size:f.size,hasCover:false,hasIcon:false,source:path,folder:parts.length>1?parts[parts.length-2]:"ROOT"});
+  }catch(e){log("تعذر تحليل "+f.name+": "+e.message);}
  }
  const ul=files.find(f=>f.name.toLowerCase()==="ul.cfg");
- if(ul){try{const b=new Uint8Array(await ul.arrayBuffer()),dec=new TextDecoder("ascii");for(let o=0,index=0;o+64<=b.length;o+=64,index++){const name=dec.decode(b.slice(o,o+32)).split("\0")[0].trim(),magic=dec.decode(b.slice(o+32,o+35)),startup=dec.decode(b.slice(o+35,o+47)).split("\0")[0].trim().toUpperCase(),parts=b[o+47],media=b[o+48];if(!name||magic!=="ul.")continue;const id=idFromName(startup),escaped=startup.replaceAll(".","\\."),pattern=new RegExp("^ul\\.[0-9a-f]{8}\\."+escaped+"\\.([0-9a-f]{2})$","i"),found=files.filter(f=>pattern.test(f.name)),nums=found.map(f=>parseInt(f.name.match(pattern)[1],16)),missing=[];for(let p=0;p<parts;p++)if(!nums.includes(p))missing.push(p);S.games.push({recordKey:localKey("LIB","UL|"+startup+"|"+name+"|"+index),title:name,gameId:id||localKey("UL",startup+"|"+name+"|"+index),oplGameId:id||null,format:"UL",size:found.reduce((n,f)=>n+f.size,0),hasCover:false,hasIcon:false,source:"ul.cfg",ulStartup:startup,ulParts:parts,ulAvailableParts:found.length,ulMissingParts:missing.length,ulMissingPartNumbers:missing,ulPartsComplete:parts>0&&!missing.length&&found.length===parts,ulPartNumbers:nums,ulMedia:media===0x12?"CD":media===0x14?"DVD":"UNKNOWN"});}}catch(e){log("تعذر تحليل ul.cfg: "+e.message);}}
+ if(ul){
+  try{
+   const b=new Uint8Array(await ul.arrayBuffer()),dec=new TextDecoder("ascii"),ulFiles=files.filter(f=>/^ul\\.[0-9a-f]{8}\\..+\\.[0-9a-f]{2}$/i.test(f.name));
+   for(let o=0,index=0;o+64<=b.length;o+=64,index++){
+    const name=dec.decode(b.slice(o,o+32)).split("\\0")[0].trim(),magic=dec.decode(b.slice(o+32,o+35)),startup=dec.decode(b.slice(o+35,o+47)).split("\\0")[0].trim().toUpperCase(),parts=b[o+47],media=b[o+48];
+    if(!name||magic!=="ul.")continue;
+    const id=idFromName(startup),escaped=startup.replaceAll(".","\\\\."),pattern=new RegExp("^ul\\\\.[0-9a-f]{8}\\\\."+escaped+"\\\\.([0-9a-f]{2})$","i"),found=ulFiles.filter(f=>pattern.test(f.name)),nums=found.map(f=>parseInt(f.name.match(pattern)[1],16)),missing=[];
+    for(let p=0;p<parts;p++)if(!nums.includes(p))missing.push(p);
+    S.games.push({recordKey:localKey("LIB","UL|"+startup+"|"+name+"|"+index),title:name,gameId:id||localKey("UL",startup+"|"+name+"|"+index),oplGameId:id||null,format:"UL",size:found.reduce((n,f)=>n+f.size,0),hasCover:false,hasIcon:false,source:"ul.cfg",ulStartup:startup,ulParts:parts,ulAvailableParts:found.length,ulMissingParts:missing.length,ulMissingPartNumbers:missing,ulPartsComplete:parts>0&&!missing.length&&found.length===parts,ulPartNumbers:nums,ulMedia:media===0x12?"CD":media===0x14?"DVD":"UNKNOWN"});
+   }
+  }catch(e){log("تعذر تحليل ul.cfg: "+e.message);}
+ }
  await hydrateMetadata();try{await saveLibrary(S.games);}catch(e){log("تعذر حفظ الفهرس: "+e.message);}render();
- $("driveName").textContent="ملفات مختارة";$("driveDot").classList.add("on");$("driveInfo").textContent="قراءة فقط · "+files.length+" ملفاً · لا يمكن الكتابة إلى USB من هذا المتصفح";
- log("فحص الملفات المختارة: "+S.games.length+" لعبة.");msg("تم العثور على "+S.games.length+" لعبة من الملفات المختارة. وضع القراءة فقط.");
+ const folders=[...new Set(gameFiles.map(f=>{const p=pathOf(f).split("/");return p.length>1?p[p.length-2]:"الجذر";}))];
+ $("driveName").textContent="مصدر ملفات مختار";$("driveDot").classList.add("on");
+ $("driveInfo").textContent="قراءة فقط · "+files.length+" ملفاً · مجلدات الألعاب: "+folders.join("، ");
+ log("اكتمل فحص الملفات المختارة: "+S.games.length+" لعبة من "+files.length+" ملفاً.");
+ msg(S.games.length?"تم العثور على "+S.games.length+" لعبة.":"لم يتم العثور على ISO أو ZSO أو إدخالات UL. اختر مجلد OPL الذي يحتوي DVD/CD أو ملفات الألعاب.");
 }
 function render(){
  const iso=S.games.filter(g=>g.format==='ISO').length,zso=S.games.filter(g=>g.format==='ZSO').length,ul=S.games.filter(g=>g.format==='UL').length,cov=S.games.filter(g=>g.hasCover).length;
@@ -264,5 +283,8 @@ async function runDiagnostics(){
  if(!S.games.length)lines.push("لم يتم فحص وحدة تخزين بعد؛ اختر USB أولاً.");
  out.textContent=lines.join("\n");log("فحص سلامة المكتبة: "+report.issues.length+" ملاحظة، و"+art.invalid.length+" صورة تحتاج تصحيحاً.");
 }
-if($("runDiagnostics"))$("runDiagnostics").onclick=runDiagnostics;\nif($("fallbackPick"))$("fallbackPick").onclick=()=>$("fallbackFiles").click();\nif($("fallbackFiles"))$("fallbackFiles").addEventListener("change",e=>{if(e.target.files?.length)scanSelectedFiles(e.target.files);e.target.value="";});
+if($("runDiagnostics"))$("runDiagnostics").onclick=runDiagnostics;\nif($("fallbackPick"))$("fallbackPick").onclick=()=>$("fallbackFiles").click();
+if($("fallbackFilesPick"))$("fallbackFilesPick").onclick=()=>$("fallbackSingleFiles").click();
+if($("fallbackFiles"))$("fallbackFiles").addEventListener("change",e=>{if(e.target.files?.length)scanSelectedFiles(e.target.files);e.target.value="";});
+if($("fallbackSingleFiles"))$("fallbackSingleFiles").addEventListener("change",e=>{if(e.target.files?.length)scanSelectedFiles(e.target.files);e.target.value="";});\nif($("fallbackFiles"))$("fallbackFiles").addEventListener("change",e=>{if(e.target.files?.length)scanSelectedFiles(e.target.files);e.target.value="";});
 renderStorageCapabilities();
