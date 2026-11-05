@@ -146,7 +146,7 @@ assert(catalog.counts.PS1>=100&&catalog.counts.PS2>=100,"central catalog must co
 assert(catalog.games.every(g=>["PS1","PS2"].includes(g.platform)&&/^[A-Z]{4}-\d{5}$/.test(g.serial)&&typeof g.title==="string"&&g.title.length>0),"catalog records must have valid platform, serial and title");
 assert(new Set(catalog.games.map(g=>g.platform+":"+g.serial)).size===catalog.games.length,"catalog serials must be unique per platform");
 assert(app.includes('split("\\0")'),"UL config must split null-terminated fields");
-assert(sw.includes("saad-ps2-v22"),"service worker cache must be bumped after artwork export changes");
+assert(sw.includes("saad-ps2-v23"),"service worker cache must be bumped after artwork export changes");
 assert(app.includes("scanGameTree"),"recursive game scanner missing");
 assert(app.includes("extractDiscId"),"disc serial extractor missing");
 assert(app.includes("await download(true)"),"automatic missing-art download missing");
@@ -208,6 +208,10 @@ assert.equal(resolverSandbox.resolvePlatform("SLPS_200.15","ISO","Tekken Tag Tou
 assert(desktopPackage.version==="1.1.3","desktop release version mismatch");
 assert(desktopPackage.devDependencies.electron==="22.3.27","legacy Windows runtime version mismatch");
 assert(desktopPackage.devDependencies["electron-builder"]==="26.18.1","electron-builder version mismatch");
+assert(desktopMain.includes("protocol.registerFileProtocol")&&!desktopMain.includes("protocol.handle("),"legacy Electron file protocol API missing");
+assert(desktopMain.includes("fetchArtworkResponse")&&!desktopMain.includes("net.fetch("),"legacy Electron HTTPS downloader missing");
+assert(app.includes("تعذر حفظ الصور على الفلاش. أعد توصيله وتحقق من سلامته ثم حاول مجدداً."),"USB failure notification should be short and clear");
+assert(!downloadPage.includes("Windows 10 أو Windows 11"),"download page should not list supported Windows versions");
 assert(desktopMain.includes("protocol.registerFileProtocol")&&!desktopMain.includes("protocol.handle("),"legacy Electron file protocol API missing");
 assert(desktopMain.includes("fetchArtworkResponse")&&!desktopMain.includes("net.fetch("),"legacy Electron HTTPS downloader missing");
 assert(app.includes("تعذر حفظ الصور على الفلاش. أعد توصيله وتحقق من سلامته ثم حاول مجدداً."),"USB failure notification should be short and clear");
