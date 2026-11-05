@@ -38,6 +38,9 @@ assert(app.includes("await verifySavedArt(art,iconName,64,64)"),"icon verificati
 assert(html.includes('src="./ps2-database.js"'),"database engine must load before app");
 assert(html.includes('id="runDiagnostics"'),"diagnostics button missing");
 assert(html.includes('id="downloadToApp"'),"online-to-OPL ART export button missing");
+assert(html.includes('id="downloadWindowsApp" href="./downloads.html"'),"website Windows download link must remain available");
+assert(app.includes('if(window.saadDesktop?.isDesktop)document.getElementById("downloadWindowsApp")?.remove();'),"Windows download link must be hidden only in the desktop app");
+assert(desktopPreload.includes("isDesktop: true"),"Electron preload must identify the desktop runtime");
 assert(app.includes("await download(false)"),"full artwork export button must write all covers to ART");
 assert(app.includes('const coverName=id+"_COV.jpg",iconName=id+"_ICO.png"'),"OPL ART filenames must use Game ID suffixes");
 assert(html.includes('id="runUsbTest"'),"real USB write/read test button missing");
@@ -92,7 +95,7 @@ assert(engine.includes("valid:[]"),"artwork inspection must return verified file
 assert(engine.includes("createImageBitmap(file)"),"artwork inspection must decode image content");
 assert(!app.includes("\\nif("),"literal escaped newline broke app.js syntax");
 assert((app.match(/fallbackFiles.*addEventListener\("change"/g)||[]).length===1,"fallback handlers must be unique");
-assert(sw.includes("saad-ps2-v16"),"service worker cache must be bumped");
+assert(sw.includes("saad-ps2-v17"),"service worker cache must be bumped");
 assert(html.includes("توافق أنظمة Windows"),"Windows compatibility note missing");
 assert(app.includes('identity.platform==="ps1"?"psx-covers":"ps2-covers"')&&app.includes('"https://raw.githubusercontent.com/xlenore/"+repository+"/main/covers/default/"'),"platform-specific cover source selection missing");
 assert(app.includes("function valid(id){const value=String(id||\"\").toUpperCase();return /^[A-Z]{4}_\\d{3}\\.\\d{2}$/.test(value.replace(\"-\",\"_\"))||isPs1Id(value);}"),"PS1 serial validation missing");
@@ -112,7 +115,7 @@ const catalog=JSON.parse(fs.readFileSync("data/game-catalog.json","utf8"));
 assert.equal(catalog.schemaVersion,1);
 assert.deepEqual(catalog.supportedFormats,["ISO","ZSO","UL","VCD","BIN","CUE","IMG","CHD","PBP"]);
 assert(app.includes('split("\\0")'),"UL config must split null-terminated fields");
-assert(sw.includes("saad-ps2-v16"),"service worker cache must be bumped after artwork export changes");
+assert(sw.includes("saad-ps2-v17"),"service worker cache must be bumped after artwork export changes");
 assert(app.includes("scanGameTree"),"recursive game scanner missing");
 assert(app.includes("extractDiscId"),"disc serial extractor missing");
 assert(app.includes("await download(true)"),"automatic missing-art download missing");
