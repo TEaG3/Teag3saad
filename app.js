@@ -99,7 +99,7 @@ async function scan(){
   $("games").innerHTML='<tr><td colspan="9" class="empty">جارٍ فحص جميع المجلدات...</td></tr>';
   S.games=await scanGameTree(S.root,"");
   try{S.games.push(...await parseUl(S.root,await S.root.getFileHandle("ul.cfg")));}catch(e){}
-  await hydrateMetadata();await inspect();
+  await hydrateMetadata();await inspect();await restoreCachedArtwork();
   try{await saveLibrary(S.games);}catch(e){log("تعذر حفظ الفهرس: "+e.message);}
   render();
   const ps1=S.games.filter(g=>g.platform==="PS1").length,ps2=S.games.filter(g=>g.platform==="PS2").length;
@@ -180,6 +180,7 @@ async function scanSelectedFiles(fileList){
   }catch(e){log("تعذر تحليل ul.cfg: "+e.message);}
  }
  await hydrateMetadata();
+ await restoreCachedArtwork();
  try{await saveLibrary(S.games);}catch(e){log("تعذر حفظ الفهرس: "+e.message);}
  render();
  const folders=[];gameFiles.forEach(function(f){const p=pathOf(f).split("/"),name=p.length>1?p[p.length-2]:"الجذر";if(folders.indexOf(name)<0)folders.push(name);});
@@ -194,7 +195,7 @@ function render(){
  $('total').textContent=S.games.length;$('iso').textContent=iso+zso;$('ul').textContent=ul;$('covers').textContent=cov;if($('ps1Count'))$('ps1Count').textContent=S.games.filter(g=>g.platform==='PS1').length;
  $('allCount').textContent=S.games.length;$('missingCount').textContent=miss;
  $('sGames').textContent=S.games.length;$('sIso').textContent=iso+zso;$('sUl').textContent=ul;$('sSize').textContent=fmt(S.games.reduce((a,g)=>a+g.size,0));
- $('csv').disabled=!S.games.length;$('rescan').disabled=!S.root;$('missing').disabled=!S.games.length;$('all').disabled=!S.games.length;
+ $('csv').disabled=!S.games.length;$('rescan').disabled=!S.root;$('missing').disabled=!S.games.length;$('all').disabled=!S.games.length;if($('downloadToApp'))$('downloadToApp').disabled=!S.games.length;
  const rows=S.games.filter(g=>(!S.query||(((g.meta?.title||g.title)+' '+(effectiveId(g)||g.gameId)).toLowerCase().includes(S.query)))&&(S.filter==='all'||(S.filter==='missing'&&(!effectiveId(g)||!g.hasCover||!g.hasIcon))||S.filter===g.format));
  $('games').innerHTML=rows.length?rows.map(g=>{
   const id=effectiveId(g),displayId=id||g.gameId,cover=g.artworkDataUrl||(id?coverUrls(id)[0]:'');
