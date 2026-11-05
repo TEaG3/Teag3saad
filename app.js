@@ -121,7 +121,7 @@ async function scanGameTree(dir,prefix){
   const ext=ent.name.split(".").pop().toLowerCase(),base=ent.name.replace(/\.[^.]+$/,"").toLowerCase();
   if(ext==="bin"&&cueBases.has(base))continue;
   try{
-   const file=await ent.getFile(),id=await extractDiscId(file);
+   let file=await ent.getFile(),id=await extractDiscId(file);\n   if(ext==="cue"&&!id){const companion=entries.find(e=>e.kind==="file"&&e.name.toLowerCase()===base+".bin");if(companion){file=await companion.getFile();id=await extractDiscId(file);}}
    const platform=((id&&isPs1Id(id))||["bin","cue","img","chd","pbp"].includes(ext))?"PS1":"PS2";
    const path=(prefix?prefix+"/":"")+ent.name;
    out.push({title:ent.name.replace(/\.[^.]+$/,""),recordKey:localKey("LIB",path.toLowerCase()),gameId:id||localKey("FILE",path.toLowerCase()),oplGameId:id||null,format:ext.toUpperCase(),platform,size:file.size,hasCover:false,hasIcon:false,source:path});
