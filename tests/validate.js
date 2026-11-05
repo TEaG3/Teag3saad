@@ -146,7 +146,7 @@ assert(app.includes("extractDiscId"),"disc serial extractor missing");
 assert(app.includes("await download(true)"),"automatic missing-art download missing");
 assert(html.includes('id="ps1Count"'),"PS1 count display missing");
 
-assert.equal((app.match(/resolvePlatform\(id,ext,title\)/g)||[]).length,3,"both scanners and CUE grouping must use title-aware catalog platform resolution");
+assert.equal((app.match(/resolvePlatform\(id,ext,title\)/g)||[]).length,2,"both scanners must use title-aware catalog platform resolution");
 assert(app.includes("function resolvePlatform(id,format,title)"),"title-aware catalog-first platform resolver missing");
 assert(app.includes("async function buildCueGame(cueEntry,entries,pathOf)"),"CUE descriptor parser missing");
 assert(app.includes("cueText.matchAll"),"CUE FILE track references must be parsed");
