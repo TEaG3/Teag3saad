@@ -62,13 +62,13 @@ assert(desktopWorkflow.includes("windows-latest")&&desktopWorkflow.includes("npm
 assert(!desktopWorkflow.includes("Portable"),"Windows workflow must not build or publish Portable");
 assert(pagesWorkflow.includes("node tests/validate.js")&&pagesWorkflow.includes("actions/deploy-pages@v5.0.1"),"web deployment workflow must remain intact");
 assert(pagesWorkflow.includes("scripts/update-game-catalog.cjs")&&pagesWorkflow.includes("schedule:"),"central catalog must be refreshed automatically");
-assert(desktopWorkflow.includes("npm ci")&&desktopWorkflow.includes("npm audit --audit-level=high"),"desktop build must use locked dependencies and audit them");
+assert(desktopWorkflow.includes("npm ci")&&desktopWorkflow.includes("npm audit --audit-level=moderate"),"desktop build must use locked dependencies and audit them");
 assert(desktopWorkflow.includes("npm run smoke")&&desktopMain.includes("--smoke-test"),"Windows workflow must smoke-test Electron startup");
 assert(desktopWorkflow.includes("WINDOWS_CERTIFICATE_BASE64")&&desktopWorkflow.includes("Get-AuthenticodeSignature"),"optional Authenticode signing and verification missing");
 assert(!downloadPage.includes("Portable"),"download page must not mention Portable edition");
-assert(downloadPage.includes("Saad-PS2-Setup-1.1.0.exe"),"download page must link Windows Setup installer");
+assert(downloadPage.includes("Saad-PS2-Setup-1.1.1.exe"),"download page must link Windows Setup installer");
 assert(downloadPage.includes("SmartScreen")&&downloadPage.includes("متطلبات التشغيل"),"download page must explain Windows security and requirements");
-assert(desktopWorkflow.includes("softprops/action-gh-release@v3.0.3")&&desktopWorkflow.includes("tag_name: desktop-latest")&&desktopWorkflow.includes("make_latest: true")&&desktopWorkflow.includes("Saad-PS2-Setup-1.1.0.exe"),"successful Windows Setup builds must publish the versioned installer");
+assert(desktopWorkflow.includes("softprops/action-gh-release@v3.0.3")&&desktopWorkflow.includes("tag_name: desktop-latest")&&desktopWorkflow.includes("make_latest: true")&&desktopWorkflow.includes("Saad-PS2-Setup-1.1.1.exe"),"successful Windows Setup builds must publish the versioned installer");
 const ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(x=>x[1]);
 assert.equal(new Set(ids).size,ids.length,"duplicate HTML IDs");
 const refs=[...app.matchAll(/\$\("([^"]+)"\)/g)].map(x=>x[1]);
@@ -150,9 +150,10 @@ assert(app.includes("window.PS2Database.classifyPlatform(id,ext)"),"recursive sc
 assert(app.includes("window.PS2Database.classifyPlatform(id,ext)"),"selected-file scanner must use verified platform classifier");
 assert(app.includes("function catalogSerial(value)"),"catalog matching must normalize dotted PS2 serials");
 assert(app.includes("function catalogOplId(record)"),"PS2 source serials must convert to OPL Game IDs");
-assert(desktopPackage.version==="1.1.0","desktop release version mismatch");
+assert(desktopPackage.version==="1.1.1","desktop release version mismatch");
 assert(desktopPackage.devDependencies.electron==="45.2.3","Electron runtime version mismatch");
 assert(desktopPackage.devDependencies["electron-builder"]==="26.18.1","electron-builder version mismatch");
 assert(desktopPackage.overrides.tar==="7.5.22","tar security override missing");
+assert(desktopPackage.overrides.minimatch==="11.0.4","minimatch security override missing");
 assert(desktopPackage.scripts.smoke&&desktopPackage.scripts.test,"desktop smoke/test commands missing");
 console.log("PASS: JS syntax, populated catalog, PS1/PS2 serial matching, diagnostics, dependency hardening and release workflow.");

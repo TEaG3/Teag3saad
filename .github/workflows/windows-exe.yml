@@ -38,35 +38,38 @@ jobs:
           package-manager-cache: false
       - name: Update central PS1/PS2 game catalog
         run: node scripts/update-game-catalog.cjs
-      - name: Generate npm lockfile on first build
+      - name: Generate or refresh npm lockfile
         id: lockfile
         working-directory: desktop
         shell: pwsh
         run: |
+          $manifest = Get-Content "package.json" -Raw | ConvertFrom-Json
+          $lock = $null
           if (Test-Path "package-lock.json") {
-            "created=false" >> $env:GITHUB_OUTPUT
-          } else {
+            $lock = Get-Content "package-lock.json" -Raw | ConvertFrom-Json
+          }
+          if (-not $lock -or $lock.version -ne $manifest.version) {
             npm install --package-lock-only --ignore-scripts --no-audit
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             "created=true" >> $env:GITHUB_OUTPUT
+          } else {
+            "created=false" >> $env:GITHUB_OUTPUT
           }
-      - name: Persist initial npm lockfile
+      - name: Persist refreshed npm lockfile
         if: steps.lockfile.outputs.created == 'true'
         shell: pwsh
         run: |
-          git fetch origin ${{ github.ref_name }}
-          git reset --hard origin/${{ github.ref_name }}
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add desktop/package-lock.json
-          git commit -m "Add reproducible Windows build lockfile"
+          git commit -m "Refresh reproducible Windows build lockfile"
           git push origin "HEAD:${{ github.ref_name }}"
       - name: Install locked desktop dependencies
         working-directory: desktop
         run: npm ci
       - name: Audit desktop build dependencies
         working-directory: desktop
-        run: npm audit --audit-level=high
+        run: npm audit --audit-level=moderate
       - name: Validate application and catalog
         run: node tests/validate.js
       - name: Stage desktop application
@@ -101,7 +104,7 @@ jobs:
         id: signature
         shell: pwsh
         run: |
-          $installer = "desktop/release/Saad-PS2-Setup-1.1.0.exe"
+          $installer = "desktop/release/Saad-PS2-Setup-1.1.1.exe"
           $signature = Get-AuthenticodeSignature -FilePath $installer
           if ($env:SAAD_SIGNING_EXPECTED -eq "true" -and $signature.Status -ne "Valid") {
             throw "A publisher certificate was configured, but Authenticode verification returned $($signature.Status)."
@@ -114,8 +117,8 @@ jobs:
       - name: Upload Windows Setup installer as workflow artifact
         uses: actions/upload-artifact@v7.0.2
         with:
-          name: Saad-PS2-Windows-Setup-1.1.0
-          path: desktop/release/Saad-PS2-Setup-1.1.0.exe
+          name: Saad-PS2-Windows-Setup-1.1.1
+          path: desktop/release/Saad-PS2-Setup-1.1.1.exe
           if-no-files-found: error
           retention-days: 30
       - name: Remove obsolete assets from the latest release
@@ -135,11 +138,11 @@ jobs:
           name: Saad PS2 Ultimate — Latest Windows Build
           body: |
             أحدث إصدار Windows من Saad PS2 Ultimate.
-            - الإصدار: 1.1.0 — Setup EXE لويندوز 64-bit.
+            - الإصدار: 1.1.1 — Setup EXE لويندوز 64-bit.
             - متوافق مع Windows 10 وWindows 11.
             - اختبار تشغيل Electron آلياً: نجح ضمن بيئة Windows CI.
             - حالة توقيع Authenticode: ${{ steps.signature.outputs.status }}.
             - اختبار USB/PS2 الحقيقي يحتاج تنفيذ قائمة الفحص على أجهزة فعلية.
-          files: desktop/release/Saad-PS2-Setup-1.1.0.exe
+          files: desktop/release/Saad-PS2-Setup-1.1.1.exe
           make_latest: true
           fail_on_unmatched_files: true

@@ -1,6 +1,6 @@
 {
   "name": "saad-ps2-desktop",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Saad PS2 Ultimate Windows desktop application",
   "main": "main.cjs",
   "author": "Saad PS2",
@@ -17,7 +17,8 @@
     "electron-builder": "26.18.1"
   },
   "overrides": {
-    "tar": "7.5.22"
+    "tar": "7.5.22",
+    "minimatch": "11.0.4"
   },
   "build": {
     "appId": "com.saadps2.ultimate",

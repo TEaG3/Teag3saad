@@ -14,7 +14,7 @@ npm ci
 npm run dist:setup
 ```
 
-Output is written to `desktop/release/Saad-PS2-Setup-1.1.0.exe`. GitHub Actions performs this build automatically when desktop or web application files change, and also supports manual runs. The workflow verifies Authenticode status. A trusted publisher certificate is optional and must be provided through repository secrets; the release states whether the published file is Valid or NotSigned.
+Output is written to `desktop/release/Saad-PS2-Setup-1.1.1.exe`. GitHub Actions performs this build automatically when desktop or web application files change, and also supports manual runs. The workflow verifies Authenticode status. A trusted publisher certificate is optional and must be provided through repository secrets; the release states whether the published file is Valid or NotSigned.
 
 
 ## Online artwork library
