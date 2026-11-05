@@ -7,9 +7,8 @@
   "license": "UNLICENSED",
   "scripts": {
     "stage": "node scripts/stage-site.cjs",
-    "dist:portable": "npm run stage && electron-builder --win portable --x64 --config.win.artifactName=Saad-PS2-Portable-${version}.${ext}",
     "dist:setup": "npm run stage && electron-builder --win nsis --x64 --config.win.artifactName=Saad-PS2-Setup-${version}.${ext}",
-    "dist:win": "npm run dist:portable && npm run dist:setup"
+    "dist:win": "npm run dist:setup"
   },
   "devDependencies": {
     "electron": "39.2.7",
@@ -38,10 +37,9 @@
     ],
     "win": {
       "target": [
-        "portable",
         "nsis"
       ],
-      "artifactName": "Saad-PS2-${version}.${ext}"
+      "artifactName": "Saad-PS2-Setup-${version}.${ext}"
     },
     "nsis": {
       "oneClick": false,
