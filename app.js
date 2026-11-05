@@ -619,5 +619,5 @@ if($("fallbackFilesPick"))$("fallbackFilesPick").onclick=()=>$("fallbackSingleFi
 if($("fallbackFiles"))$("fallbackFiles").addEventListener("change",e=>{if(e.target.files?.length)scanSelectedFiles(e.target.files);e.target.value="";});
 if($("fallbackSingleFiles"))$("fallbackSingleFiles").addEventListener("change",e=>{if(e.target.files?.length)scanSelectedFiles(e.target.files);e.target.value="";});
 
-window.SaadPS2TestBridge={getState:()=>({root:S.root,games:S.games,catalog:S.catalog,catalogStatus:S.catalogStatus}),runUsbTest:testUsbDrive,runDiagnostics,fetchArt,effectiveId};
+window.SaadPS2TestBridge={getState:()=>({root:S.root,games:S.games,catalog:S.catalog,catalogStatus:S.catalogStatus}),ensureDb:async()=>{const db=await getDb();return db;},runUsbTest:testUsbDrive,runDiagnostics,fetchArt,effectiveId};
 renderStorageCapabilities();
