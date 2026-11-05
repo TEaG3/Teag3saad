@@ -42,7 +42,7 @@ assert(app.includes("await download(false)"),"full artwork export button must wr
 assert(app.includes('const coverName=id+"_COV.jpg",iconName=id+"_ICO.png"'),"OPL ART filenames must use Game ID suffixes");
 assert(html.includes('id="runUsbTest"'),"real USB write/read test button missing");
 assert(html.includes('id="usbTestResults"'),"USB test result panel missing");
-assert(sw.includes("./ps2-database.js"),"service worker must cache database engine");
+assert(sw.includes("./ps2-database.js")&&sw.includes("./downloads.html"),"service worker must cache database engine and download page");
 assert(sw.match(/saad-ps2-v\d+/),"cache version missing");
 assert(manifest.name==="Saad PS2 Ultimate","manifest identity mismatch");
 assert(!desktopPackage.scripts["dist:portable"],"Portable EXE build target must be removed");
@@ -50,7 +50,7 @@ assert(desktopPackage.scripts["dist:setup"].includes("--win nsis"),"Setup EXE bu
 assert(desktopPackage.scripts["dist:win"]==="npm run dist:setup","Windows build must produce Setup only");
 assert(desktopMain.includes("nodeIntegration: false")&&desktopMain.includes("contextIsolation: true")&&desktopMain.includes("sandbox: true"),"Electron renderer security settings missing");
 assert(desktopMain.includes("protocol.registerSchemesAsPrivileged")&&desktopMain.includes("app://saad/index.html"),"secure local desktop origin missing");
-assert(desktopStage.includes("index.html")&&desktopStage.includes("data"),"desktop staging must package web app and catalog");
+assert(desktopStage.includes("index.html")&&desktopStage.includes("downloads.html")&&desktopStage.includes("data"),"desktop staging must package web app, download page and catalog");
 assert(desktopWorkflow.includes("windows-latest")&&desktopWorkflow.includes("npm run dist:setup"),"Windows Setup build workflow missing");
 assert(!desktopWorkflow.includes("Portable"),"Windows workflow must not build or publish Portable");
 assert(pagesWorkflow.includes("node tests/validate.js")&&pagesWorkflow.includes("actions/deploy-pages@v4"),"web deployment workflow must remain intact");
@@ -92,7 +92,7 @@ assert(engine.includes("valid:[]"),"artwork inspection must return verified file
 assert(engine.includes("createImageBitmap(file)"),"artwork inspection must decode image content");
 assert(!app.includes("\\nif("),"literal escaped newline broke app.js syntax");
 assert((app.match(/fallbackFiles.*addEventListener\("change"/g)||[]).length===1,"fallback handlers must be unique");
-assert(sw.includes("saad-ps2-v15"),"service worker cache must be bumped");
+assert(sw.includes("saad-ps2-v16"),"service worker cache must be bumped");
 assert(html.includes("توافق أنظمة Windows"),"Windows compatibility note missing");
 assert(app.includes('identity.platform==="ps1"?"psx-covers":"ps2-covers"')&&app.includes('"https://raw.githubusercontent.com/xlenore/"+repository+"/main/covers/default/"'),"platform-specific cover source selection missing");
 assert(app.includes("function valid(id){const value=String(id||\"\").toUpperCase();return /^[A-Z]{4}_\\d{3}\\.\\d{2}$/.test(value.replace(\"-\",\"_\"))||isPs1Id(value);}"),"PS1 serial validation missing");
@@ -112,7 +112,7 @@ const catalog=JSON.parse(fs.readFileSync("data/game-catalog.json","utf8"));
 assert.equal(catalog.schemaVersion,1);
 assert.deepEqual(catalog.supportedFormats,["ISO","ZSO","UL","VCD","BIN","CUE","IMG","CHD","PBP"]);
 assert(app.includes('split("\\0")'),"UL config must split null-terminated fields");
-assert(sw.includes("saad-ps2-v15"),"service worker cache must be bumped after artwork export changes");
+assert(sw.includes("saad-ps2-v16"),"service worker cache must be bumped after artwork export changes");
 assert(app.includes("scanGameTree"),"recursive game scanner missing");
 assert(app.includes("extractDiscId"),"disc serial extractor missing");
 assert(app.includes("await download(true)"),"automatic missing-art download missing");
