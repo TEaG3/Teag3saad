@@ -63,6 +63,9 @@ jobs:
       - name: Refresh lockfile for the selected runtime
         working-directory: desktop
         run: npm install --package-lock-only --ignore-scripts --no-audit
+      - name: Refresh lockfile for the selected runtime
+        working-directory: desktop
+        run: npm install --package-lock-only --ignore-scripts --no-audit
       - name: Install locked desktop dependencies
         working-directory: desktop
         run: npm ci
