@@ -117,7 +117,7 @@ async function scanGameTree(dir,prefix){
    if(ent.name.toUpperCase()==="ART")continue;
    out.push(...await scanGameTree(ent,prefix?prefix+"/"+ent.name:ent.name));continue;
   }
-  if(ent.kind!=="file"||!/\.(iso|zso|bin|cue|img|chd|pbp)$/i.test(ent.name))continue;
+  if(ent.kind!=="file"||!/\.(iso|zso|bin|cue|img|chd|pbp|vcd)$/i.test(ent.name))continue;
   const ext=ent.name.split(".").pop().toLowerCase(),base=ent.name.replace(/\.[^.]+$/,"").toLowerCase();
   if(ext==="bin"&&cueBases.has(base))continue;
   try{
@@ -137,7 +137,7 @@ async function scanSelectedFiles(fileList){
  $("driveName").textContent="جارٍ فحص الملفات المختارة";
  $("driveInfo").textContent="قراءة الملفات وتحليلها...";
  $("games").innerHTML='<tr><td colspan="9" class="empty">جارٍ تحليل الملفات...</td></tr>';
-  const gameFiles=files.filter(function(f){return /\.(iso|zso|bin|cue|img|chd|pbp)$/i.test(f.name);});
+  const gameFiles=files.filter(function(f){return /\.(iso|zso|bin|cue|img|chd|pbp|vcd)$/i.test(f.name);});
  for(let i=0;i<gameFiles.length;i++){
   const f=gameFiles[i];
   try{
