@@ -145,9 +145,10 @@ async function scanGameTree(dir,prefix){
   try{
    let file=await ent.getFile(),id=await extractDiscId(file);
    if(ext==="cue"&&!id){const companion=entries.find(e=>e.kind==="file"&&e.name.toLowerCase()===base+".bin");if(companion){file=await companion.getFile();id=await extractDiscId(file);}}
-   const platform=resolvePlatform(id,ext);
+   const title=ent.name.replace(/\.[^.]+$/,"");
+   const platform=resolvePlatform(id,ext,title);
    const path=(prefix?prefix+"/":"")+ent.name;
-   out.push({title:ent.name.replace(/\.[^.]+$/,""),recordKey:localKey("LIB",path.toLowerCase()),gameId:id||localKey("FILE",path.toLowerCase()),oplGameId:id||null,format:ext.toUpperCase(),platform,size:file.size,hasCover:false,hasIcon:false,source:path});
+   out.push({title,recordKey:localKey("LIB",path.toLowerCase()),gameId:id||localKey("FILE",path.toLowerCase()),oplGameId:id||null,format:ext.toUpperCase(),platform,size:file.size,hasCover:false,hasIcon:false,source:path});
   }catch(e){log("تعذر قراءة "+ent.name+": "+e.message);}
  }
  return out;
@@ -163,8 +164,8 @@ async function scanSelectedFiles(fileList){
  for(let i=0;i<gameFiles.length;i++){
   const f=gameFiles[i];
   try{
-    const path=pathOf(f),parts=path.split("/"),id=await extractDiscId(f),ext=f.name.split(".").pop().toUpperCase(),platform=resolvePlatform(id,ext);
-    S.games.push({title:f.name.replace(/\.[^.]+$/,""),recordKey:localKey("LIB",path.toLowerCase()),gameId:id||localKey("FILE",path.toLowerCase()),oplGameId:id||null,format:ext,platform,size:f.size,hasCover:false,hasIcon:false,source:path,folder:parts.length>1?parts[parts.length-2]:"ROOT"});
+    const path=pathOf(f),parts=path.split("/"),id=await extractDiscId(f),ext=f.name.split(".").pop().toUpperCase(),title=f.name.replace(/\.[^.]+$/,""),platform=resolvePlatform(id,ext,title);
+    S.games.push({title,recordKey:localKey("LIB",path.toLowerCase()),gameId:id||localKey("FILE",path.toLowerCase()),oplGameId:id||null,format:ext,platform,size:f.size,hasCover:false,hasIcon:false,source:path,folder:parts.length>1?parts[parts.length-2]:"ROOT"});
   }catch(e){log("تعذر تحليل "+f.name+": "+e.message);}
  }
  const ul=files.find(function(f){return f.name.toLowerCase()==="ul.cfg";});
@@ -380,20 +381,29 @@ function catalogOplId(record){
  const match=serial.match(/^([A-Z]{4})-(\d{5})$/);
  return match?match[1]+"_"+match[2].slice(0,3)+"."+match[2].slice(3):null;
 }
-function findCatalogRecord(id){
+function normalizeCatalogTitle(value){
+ return String(value||"").replace(/\.[^.]+$/,"").replace(/\((?:USA|U|NTSC-U|EUROPE|EU|PAL|JAPAN|JAP|ASIA|WORLD|NTSC-J)\)/gi," ").replace(/\b(?:track|disc|disk)\s*\d+\b/gi," ").toLowerCase().replace(/[^a-z0-9]+/g," ").trim().replace(/\s+/g," ");
+}
+function findCatalogRecord(id,title){
  const key=catalogSerial(id);if(!key)return null;
  const matches=S.catalog.filter(v=>catalogSerial(v.serial)===key&&["PS1","PS2"].includes(v.platform));
- return matches.length===1?matches[0]:null;
+ if(matches.length===1)return matches[0];
+ if(matches.length>1&&title){
+  const wanted=normalizeCatalogTitle(title);
+  const exact=matches.filter(v=>normalizeCatalogTitle(v.title)===wanted);
+  if(exact.length===1)return exact[0];
+ }
+ return null;
 }
-function resolvePlatform(id,format){
+function resolvePlatform(id,format,title){
+ const record=findCatalogRecord(id,title);
+ if(record)return record.platform;
  const key=catalogSerial(id);
  if(key){
   const matches=S.catalog.filter(v=>catalogSerial(v.serial)===key&&["PS1","PS2"].includes(v.platform));
-  if(matches.length===1)return matches[0].platform;
   if(matches.length>1)return "UNKNOWN";
  }
- // Dotted IDs are shared by PS1 disc boot identifiers and PS2 serials.
- // Without a unique catalog match, never guess the console generation.
+ // Dotted IDs can represent either console generation. Never guess without a catalog match.
  if(/^[A-Z]{4}[_-]\d{3}\.\d{2}$/.test(String(id||"").toUpperCase()))return "UNKNOWN";
  return window.PS2Database.classifyPlatform(id,format);
 }
@@ -407,7 +417,7 @@ async function hydrateMetadata(){
  try{
   const rows=await allMetadata(),map=new Map(rows.map(v=>[v.gameId,v]));
   S.games.forEach(g=>{
-   const local=map.get(g.gameId)||null,rawId=g.oplGameId||g.gameId,central=findCatalogRecord(rawId);
+   const local=map.get(g.gameId)||null,rawId=g.oplGameId||g.gameId,central=findCatalogRecord(rawId,g.title);
    g.catalog=central;if(central)g.platform=central.platform;
    g.meta=local||(central?{title:central.title||g.title,genre:central.genre||"",region:central.region||"",year:central.year||"",publisher:central.publisher||"",developer:central.developer||""}:null);
    g.oplGameId=local?.oplGameId||catalogOplId(central)||(valid(g.gameId)?g.gameId:null);
