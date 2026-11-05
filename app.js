@@ -78,7 +78,7 @@ async function inspect(){
  });
 }
 async function scan(){
- if(!("showDirectoryPicker"in window)){ $("fallbackPick").hidden=false; $("fallbackFiles").click(); return; }
+ if(!("showDirectoryPicker"in window)){ $("fallbackPick").hidden=false; $("fallbackFilesPick").hidden=false; msg("هذا المتصفح لا يدعم الوصول المباشر للمجلدات. اختر مجلد OPL أو ملفات الألعاب يدوياً؛ وضع الملفات المختارة للقراءة فقط."); return; }
  try{
   S.root=await showDirectoryPicker({mode:"readwrite"});
   $("fallbackPick").hidden=true;
@@ -95,34 +95,48 @@ async function scan(){
  }catch(e){if(e.name!=="AbortError")msg("تعذر فحص المجلد: "+e.message,true);}
 }
 async function scanSelectedFiles(fileList){
- const files=[...fileList], pathOf=f=>(f.webkitRelativePath||f.name).replace(/\\\\/g,"/"), upperPath=f=>pathOf(f).toUpperCase();
+ const files=Array.prototype.slice.call(fileList||[]);
+ const pathOf=function(f){return String(f.webkitRelativePath||f.name||"").replace(/\\/g,"/");};
  S.root=null;S.games=[];
- const gameFiles=files.filter(f=>/\\.(iso|zso)$/i.test(f.name));
- for(const f of gameFiles){
+ $("driveName").textContent="جارٍ فحص الملفات المختارة";
+ $("driveInfo").textContent="قراءة الملفات وتحليلها...";
+ $("games").innerHTML='<tr><td colspan="9" class="empty">جارٍ تحليل الملفات...</td></tr>';
+ const gameFiles=files.filter(function(f){return /\.(iso|zso)$/i.test(f.name);});
+ for(let i=0;i<gameFiles.length;i++){
+  const f=gameFiles[i];
   try{
-   const path=pathOf(f),parts=path.split("/"),isIso=/\\.iso$/i.test(f.name),id=isIso?await gameId(f):idFromName(f.name);
-   S.games.push({title:f.name.replace(/\\.(iso|zso)$/i,""),recordKey:localKey("LIB",path.toLowerCase()),gameId:id||localKey("FILE",path.toLowerCase()),oplGameId:id||null,format:isIso?"ISO":"ZSO",size:f.size,hasCover:false,hasIcon:false,source:path,folder:parts.length>1?parts[parts.length-2]:"ROOT"});
+   const path=pathOf(f),parts=path.split("/"),isIso=/\.iso$/i.test(f.name),id=isIso?await gameId(f):idFromName(f.name);
+   S.games.push({title:f.name.replace(/\.(iso|zso)$/i,""),recordKey:localKey("LIB",path.toLowerCase()),gameId:id||localKey("FILE",path.toLowerCase()),oplGameId:id||null,format:isIso?"ISO":"ZSO",size:f.size,hasCover:false,hasIcon:false,source:path,folder:parts.length>1?parts[parts.length-2]:"ROOT"});
   }catch(e){log("تعذر تحليل "+f.name+": "+e.message);}
  }
- const ul=files.find(f=>f.name.toLowerCase()==="ul.cfg");
+ const ul=files.find(function(f){return f.name.toLowerCase()==="ul.cfg";});
  if(ul){
   try{
-   const b=new Uint8Array(await ul.arrayBuffer()),dec=new TextDecoder("ascii"),ulFiles=files.filter(f=>/^ul\\.[0-9a-f]{8}\\..+\\.[0-9a-f]{2}$/i.test(f.name));
+   const b=new Uint8Array(await ul.arrayBuffer()),dec=new TextDecoder("ascii");
+   const ulFiles=files.filter(function(f){return /^ul\.[0-9a-f]{8}\..+\.[0-9a-f]{2}$/i.test(f.name);});
    for(let o=0,index=0;o+64<=b.length;o+=64,index++){
-    const name=dec.decode(b.slice(o,o+32)).split("\\0")[0].trim(),magic=dec.decode(b.slice(o+32,o+35)),startup=dec.decode(b.slice(o+35,o+47)).split("\\0")[0].trim().toUpperCase(),parts=b[o+47],media=b[o+48];
+    const name=dec.decode(b.slice(o,o+32)).split("\0")[0].trim();
+    const magic=dec.decode(b.slice(o+32,o+35));
+    const startup=dec.decode(b.slice(o+35,o+47)).split("\0")[0].trim().toUpperCase();
+    const parts=b[o+47],media=b[o+48];
     if(!name||magic!=="ul.")continue;
-    const id=idFromName(startup),escaped=startup.replaceAll(".","\\\\."),pattern=new RegExp("^ul\\\\.[0-9a-f]{8}\\\\."+escaped+"\\\\.([0-9a-f]{2})$","i"),found=ulFiles.filter(f=>pattern.test(f.name)),nums=found.map(f=>parseInt(f.name.match(pattern)[1],16)),missing=[];
-    for(let p=0;p<parts;p++)if(!nums.includes(p))missing.push(p);
-    S.games.push({recordKey:localKey("LIB","UL|"+startup+"|"+name+"|"+index),title:name,gameId:id||localKey("UL",startup+"|"+name+"|"+index),oplGameId:id||null,format:"UL",size:found.reduce((n,f)=>n+f.size,0),hasCover:false,hasIcon:false,source:"ul.cfg",ulStartup:startup,ulParts:parts,ulAvailableParts:found.length,ulMissingParts:missing.length,ulMissingPartNumbers:missing,ulPartsComplete:parts>0&&!missing.length&&found.length===parts,ulPartNumbers:nums,ulMedia:media===0x12?"CD":media===0x14?"DVD":"UNKNOWN"});
+    const id=idFromName(startup),escaped=startup.replace(/\./g,"\\.");
+    const pattern=new RegExp("^ul\\.[0-9a-f]{8}\\."+escaped+"\\.([0-9a-f]{2})$","i");
+    const found=ulFiles.filter(function(f){return pattern.test(f.name);});
+    const nums=found.map(function(f){const m=f.name.match(pattern);return m?parseInt(m[1],16):-1;}).filter(function(n){return n>=0;});
+    const missing=[];for(let p=0;p<parts;p++)if(nums.indexOf(p)<0)missing.push(p);
+    S.games.push({recordKey:localKey("LIB","UL|"+startup+"|"+name+"|"+index),title:name,gameId:id||localKey("UL",startup+"|"+name+"|"+index),oplGameId:id||null,format:"UL",size:found.reduce(function(n,f){return n+f.size;},0),hasCover:false,hasIcon:false,source:"ul.cfg",ulStartup:startup,ulParts:parts,ulAvailableParts:found.length,ulMissingParts:missing.length,ulMissingPartNumbers:missing,ulPartsComplete:parts>0&&missing.length===0&&found.length===parts,ulPartNumbers:nums,ulMedia:media===0x12?"CD":media===0x14?"DVD":"UNKNOWN"});
    }
   }catch(e){log("تعذر تحليل ul.cfg: "+e.message);}
  }
- await hydrateMetadata();try{await saveLibrary(S.games);}catch(e){log("تعذر حفظ الفهرس: "+e.message);}render();
- const folders=[...new Set(gameFiles.map(f=>{const p=pathOf(f).split("/");return p.length>1?p[p.length-2]:"الجذر";}))];
+ await hydrateMetadata();
+ try{await saveLibrary(S.games);}catch(e){log("تعذر حفظ الفهرس: "+e.message);}
+ render();
+ const folders=[];gameFiles.forEach(function(f){const p=pathOf(f).split("/"),name=p.length>1?p[p.length-2]:"الجذر";if(folders.indexOf(name)<0)folders.push(name);});
  $("driveName").textContent="مصدر ملفات مختار";$("driveDot").classList.add("on");
  $("driveInfo").textContent="قراءة فقط · "+files.length+" ملفاً · مجلدات الألعاب: "+folders.join("، ");
  log("اكتمل فحص الملفات المختارة: "+S.games.length+" لعبة من "+files.length+" ملفاً.");
- msg(S.games.length?"تم العثور على "+S.games.length+" لعبة.":"لم يتم العثور على ISO أو ZSO أو إدخالات UL. اختر مجلد OPL الذي يحتوي DVD/CD أو ملفات الألعاب.");
+ msg(S.games.length?"تم العثور على "+S.games.length+" لعبة.":"لم يتم العثور على ISO أو ZSO أو إدخالات UL. اختر مجلد OPL أو مجلد الألعاب.");
 }
 function render(){
  const iso=S.games.filter(g=>g.format==='ISO').length,zso=S.games.filter(g=>g.format==='ZSO').length,ul=S.games.filter(g=>g.format==='UL').length,cov=S.games.filter(g=>g.hasCover).length;
@@ -193,7 +207,7 @@ function view(name){document.querySelectorAll(".view").forEach(x=>x.classList.re
 document.querySelectorAll(".nav").forEach(b=>b.addEventListener("click",()=>view(b.dataset.view)));
 document.querySelectorAll(".filter").forEach(b=>b.addEventListener("click",()=>{S.filter=b.dataset.filter;document.querySelectorAll(".filter").forEach(x=>x.classList.toggle("active",x===b));render();}));
 $("scan").onclick=scan;$("rescan").onclick=scan;$("csv").onclick=csv;$("missing").onclick=()=>download(true);$("all").onclick=()=>download(false);$("search").oninput=e=>{S.query=e.target.value.toLowerCase();render();};$("menu").onclick=()=>$("sidebar").classList.toggle("open");
-$("offline").onclick=async()=>{if(!("showDirectoryPicker"in window)){msg("اختيار المجلد غير مدعوم في هذا المتصفح.",true);return;}try{S.offline=await showDirectoryPicker({mode:"read"});$("offlineName").textContent=S.offline.name;msg("تم اختيار مجلد الصور.");}catch(e){}};
+$("offline").onclick=async()=>{if(!("showDirectoryPicker"in window)){msg("اختيار مجلد الصور المحلي غير مدعوم في هذا المتصفح؛ يمكنك استخدام الصور المتاحة عبر الإنترنت.",true);return;}try{S.offline=await showDirectoryPicker({mode:"read"});$("offlineName").textContent=S.offline.name;msg("تم اختيار مجلد الصور.");}catch(e){}};
 if("serviceWorker"in navigator&&location.protocol.startsWith("http"))navigator.serviceWorker.register("./sw.js").catch(()=>{});
 
 function openDb(){return new Promise((resolve,reject)=>{const req=indexedDB.open("saad-ps2-db",2);req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains("games"))db.createObjectStore("games",{keyPath:"gameId"});if(!db.objectStoreNames.contains("library"))db.createObjectStore("library",{keyPath:"recordKey"});};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);req.onblocked=()=>reject(new Error("أغلق النسخ القديمة من الموقع لإكمال تحديث قاعدة البيانات."));});}
