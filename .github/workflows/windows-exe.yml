@@ -34,14 +34,14 @@ jobs:
       - name: Install desktop build dependencies
         working-directory: desktop
         run: npm install
-      - name: Build Portable and Setup EXE
+      - name: Build Windows Setup EXE
         working-directory: desktop
-        run: npm run dist:win
-      - name: Upload Windows installers as workflow artifact
+        run: npm run dist:setup
+      - name: Upload Windows Setup installer as workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Saad-PS2-Windows-EXE
-          path: desktop/release/*.exe
+          name: Saad-PS2-Windows-Setup
+          path: desktop/release/Saad-PS2-Setup-*.exe
           if-no-files-found: error
           retention-days: 30
       - name: Publish or update the latest Windows release
@@ -52,9 +52,8 @@ jobs:
           body: |
             أحدث إصدار Windows من Saad PS2 Ultimate.
 
-            - Portable EXE: يعمل دون تثبيت تقليدي.
-            - Setup EXE: مثبت Windows مع اختصار.
-            - إذا كان Windows يعرض تحذير الناشر، فهذا لأن الملفات غير موقعة رقمياً حالياً.
-          files: desktop/release/*.exe
+            - Setup EXE: مثبت Windows مع اختصار لسطح المكتب وقائمة ابدأ.
+            - إذا كان Windows يعرض تحذير الناشر، فهذا لأن الملف غير موقع رقمياً حالياً.
+          files: desktop/release/Saad-PS2-Setup-*.exe
           make_latest: true
           fail_on_unmatched_files: true
