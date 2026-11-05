@@ -1,6 +1,5 @@
 "use strict";
 const { app, BrowserWindow, shell, protocol, net, ipcMain } = require("electron");
-const { pathToFileURL } = require("node:url");
 const path = require("node:path");
 const fs = require("node:fs/promises");
 const smokeTest = process.argv.includes("--smoke-test");
