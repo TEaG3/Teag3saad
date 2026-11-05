@@ -15,7 +15,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: windows-exe-${{ github.ref }}
@@ -37,10 +37,24 @@ jobs:
       - name: Build Portable and Setup EXE
         working-directory: desktop
         run: npm run dist:win
-      - name: Upload Windows installers
+      - name: Upload Windows installers as workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: Saad-PS2-Windows-EXE
           path: desktop/release/*.exe
           if-no-files-found: error
           retention-days: 30
+      - name: Publish or update the latest Windows release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: desktop-latest
+          name: Saad PS2 Ultimate — Latest Windows Build
+          body: |
+            أحدث إصدار Windows من Saad PS2 Ultimate.
+
+            - Portable EXE: يعمل دون تثبيت تقليدي.
+            - Setup EXE: مثبت Windows مع اختصار.
+            - إذا كان Windows يعرض تحذير الناشر، فهذا لأن الملفات غير موقعة رقمياً حالياً.
+          files: desktop/release/*.exe
+          make_latest: true
+          fail_on_unmatched_files: true
