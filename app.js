@@ -99,8 +99,9 @@ async function scan(){
   $("games").innerHTML='<tr><td colspan="9" class="empty">جارٍ فحص جميع المجلدات...</td></tr>';
   S.games=await scanGameTree(S.root,"");
   try{S.games.push(...await parseUl(S.root,await S.root.getFileHandle("ul.cfg")));}catch(e){}
-  await hydrateMetadata();await inspect();await restoreCachedArtwork();
+  await hydrateMetadata();await inspect();
   try{await saveLibrary(S.games);}catch(e){log("تعذر حفظ الفهرس: "+e.message);}
+  await restoreCachedArtwork();
   render();
   const ps1=S.games.filter(g=>g.platform==="PS1").length,ps2=S.games.filter(g=>g.platform==="PS2").length;
   log("اكتمل الفحص: PS1 "+ps1+"، PS2 "+ps2+"، الإجمالي "+S.games.length+".");
@@ -180,8 +181,8 @@ async function scanSelectedFiles(fileList){
   }catch(e){log("تعذر تحليل ul.cfg: "+e.message);}
  }
  await hydrateMetadata();
- await restoreCachedArtwork();
  try{await saveLibrary(S.games);}catch(e){log("تعذر حفظ الفهرس: "+e.message);}
+ await restoreCachedArtwork();
  render();
  const folders=[];gameFiles.forEach(function(f){const p=pathOf(f).split("/"),name=p.length>1?p[p.length-2]:"الجذر";if(folders.indexOf(name)<0)folders.push(name);});
  $("driveName").textContent="مصدر ملفات مختار";$("driveDot").classList.add("on");
