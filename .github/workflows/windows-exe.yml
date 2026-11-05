@@ -12,6 +12,8 @@ on:
       - "manifest.webmanifest"
       - "sw.js"
       - "data/**"
+      - "tests/**"
+      - ".github/workflows/windows-exe.yml"
   workflow_dispatch:
 
 permissions:
@@ -44,6 +46,16 @@ jobs:
           path: desktop/release/Saad-PS2-Setup-*.exe
           if-no-files-found: error
           retention-days: 30
+      - name: Remove obsolete assets from the latest release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view desktop-latest >/dev/null 2>&1; then
+            while IFS= read -r asset; do
+              [ -z "$asset" ] || gh release delete-asset desktop-latest "$asset" --yes
+            done < <(gh release view desktop-latest --json assets --jq '.assets[].name')
+          fi
       - name: Publish or update the latest Windows release
         uses: softprops/action-gh-release@v2
         with:
@@ -53,6 +65,8 @@ jobs:
             أحدث إصدار Windows من Saad PS2 Ultimate.
 
             - Setup EXE: مثبت Windows مع اختصار لسطح المكتب وقائمة ابدأ.
+            - متوافق مع Windows 10 وWindows 11 (64-bit).
+            - Windows 7 غير مدعوم في إصدار Electron الحالي.
             - إذا كان Windows يعرض تحذير الناشر، فهذا لأن الملف غير موقع رقمياً حالياً.
           files: desktop/release/Saad-PS2-Setup-*.exe
           make_latest: true
