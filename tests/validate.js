@@ -22,7 +22,7 @@ const downloadPage=readFile("downloads.html");
 new Function(app);
 new Function(sw);
 new Function(engine);
-assert(app.includes("function artworkIdentity(id)"),"artwork serial normalization missing");
+assert(app.includes("function artworkIdentity(id,platformHint)"),"artwork serial normalization missing");
 assert(app.includes('serial:match[1]+"-"+match[2]+match[3]'),"PS2 serial dot-to-five-digit conversion missing");
 assert(app.includes("window.saadDesktop?.downloadArtwork"),"Windows native artwork downloader is not connected");
 assert(app.includes("async function downloadArtworkToApp()"),"in-app artwork cache download flow missing");
