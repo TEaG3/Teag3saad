@@ -46,7 +46,7 @@ jobs:
           $manifest = Get-Content "package.json" -Raw | ConvertFrom-Json
           $lock = $null
           if (Test-Path "package-lock.json") {
-            $lock = Get-Content "package-lock.json" -Raw | ConvertFrom-Json
+            $lock = Get-Content "package-lock.json" -Raw | ConvertFrom-Json -AsHashtable
           }
           if (-not $lock -or $lock.version -ne $manifest.version) {
             npm install --package-lock-only --ignore-scripts --no-audit
