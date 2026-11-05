@@ -41,23 +41,30 @@
   return {total:list.length,identified:[...list].filter(g=>normalizeId(g.oplGameId||g.gameId)).length,missingId:list.filter(g=>!normalizeId(g.oplGameId||g.gameId)).length,duplicateIds:[...byId].filter(([,v])=>v.length>1).length,incompleteUl:list.filter(g=>g.format==="UL"&&!g.ulPartsComplete).length,issues,regions:list.reduce((o,g)=>{const r=regionFromId(g.oplGameId||g.gameId);o[r.code]=(o[r.code]||0)+1;return o;},{})};
  }
  async function inspectArt(root){
-  const report={files:0,covers:0,icons:0,invalid:[],missing:[]};
+  const report={files:0,covers:0,icons:0,valid:[],invalid:[],missing:[]};
   let art;try{art=await root.getDirectoryHandle("ART");}catch(e){return {...report,missing:["مجلد ART غير موجود"]};}
   const map=new Map();
   for await(const entry of art.values()){
    if(entry.kind!=="file")continue;
    const name=entry.name.toUpperCase();report.files++;map.set(name,entry);
-   if(name.endsWith("_COV.JPG")||name.endsWith("_COV.PNG"))report.covers++;
-   if(name.endsWith("_ICO.PNG"))report.icons++;
   }
   for(const [name,entry] of map){
-   if(!(/_(COV\.(JPG|PNG)|ICO\.PNG)$/i.test(name)))continue;
+   const isCover=/_COV\.(JPG|PNG)$/i.test(name);
+   const isIcon=/_ICO\.PNG$/i.test(name);
+   if(!isCover&&!isIcon)continue;
    try{
-    const bitmap=await createImageBitmap(await entry.getFile());
-    const expected=name.includes("_COV.")?[140,200]:[64,64];
-    if(bitmap.width!==expected[0]||bitmap.height!==expected[1])report.invalid.push({name,actual:bitmap.width+"×"+bitmap.height,expected:expected.join("×")});
+    const file=await entry.getFile();
+    if(!file.size)throw new Error("ملف فارغ");
+    const bitmap=await createImageBitmap(file);
+    const expected=isCover?[140,200]:[64,64];
+    const dimensions=bitmap.width===expected[0]&&bitmap.height===expected[1];
+    const actual=bitmap.width+"×"+bitmap.height;
     bitmap.close();
-   }catch(e){report.invalid.push({name,actual:"ملف صورة غير قابل للقراءة",expected:"صورة سليمة"});}
+    if(!dimensions){report.invalid.push({name,actual,expected:expected.join("×")});continue;}
+    report.valid.push(name);
+    if(isCover)report.covers++;
+    if(isIcon)report.icons++;
+   }catch(e){report.invalid.push({name,actual:e.message||"ملف صورة غير قابل للقراءة",expected:isCover?"140×200":"64×64"});}
   }
   return report;
  }
