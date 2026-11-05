@@ -23,13 +23,13 @@
 </div>
 <button id="downloadToApp" hidden disabled type="button"></button>
 <div id="progress" class="progress" hidden><b id="progressText">جاري العمل</b><span id="progressCount">0 / 0</span><div><i id="progressBar"></i></div><small id="progressDetail"></small></div>
-<div id="diagnosticResults" class="notice" hidden></div>
+
 <details class="help-details"><summary>أين تحفظ الصور؟</summary><p><b>ART</b> للأغلفة باسم GAMEID_COV.jpg (140×200).</p><p><b>ICONS</b> للأيقونات باسم GAMEID_ICO.png (64×64).</p><p>المجلدان في جذر الفلاش، بجانب DVD وCD.</p></details>
 <details class="help-details"><summary>مجلد صور محلي دون إنترنت</summary><p>اختر مجلداً يحتوي صوراً محفوظة مسبقاً.</p><button id="offline" class="secondary">اختيار مجلد الصور</button><small id="offlineName">لم يتم اختيار مجلد</small></details>
 </section><section class="view" id="storage"><div class="intro"><small>STORAGE INSIGHTS</small><h1>تحليل وحدة التخزين</h1><p>فحص الملفات يعتمد على صلاحيات المتصفح ونظام التشغيل؛ وحدات FAT وFAT32 وexFAT تعمل عند تعرف النظام عليها وإتاحة الوصول للمتصفح. هذه أنظمة ملفات للفلاش وليست صيغ ألعاب؛ ويعتمد دعم تشغيلها في OPL على إصدار OPL وطريقة التوصيل.</p></div><div class="stats"><article><span>عدد الألعاب</span><b id="sGames">0</b></article><article><span>ألعاب ISO</span><b id="sIso">0</b></article><article><span>ألعاب UL</span><b id="sUl">0</b></article><article><span>الحجم المعروف</span><b id="sSize">—</b></article></div><div class="notice" id="storageSupport"><b>دعم وحدات التخزين:</b> جارٍ تحديد إمكانات المتصفح...</div>
 <div class="cards">
 <article><b>USB I/O</b><h3>اختبار الكتابة والقراءة الفعلية</h3><p>ينشئ ملف اختبار مؤقتاً بحجم 4 MiB على الفلاش، ثم يقرأه ويقارن كل بايت ويحذفه بعد الاختبار.</p><button id="runUsbTest" class="primary">اختبار الفلاش الآن</button></article>
-<article><b>ART VERIFY</b><h3>التحقق من الصور المحفوظة</h3><p>يفتح ملفات الأغلفة والأيقونات من داخل ART ويتحقق من أن الصور قابلة للقراءة وبالأبعاد المطلوبة.</p><button id="runDiagnostics" class="secondary">فحص الصور والمكتبة</button></article>
+
 </div>
 <div id="usbTestResults" class="notice" hidden aria-live="polite"></div>
 <div id="diagnosticResults" class="notice" hidden></div><div class="notice"><b>توافق أنظمة Windows:</b> Windows 10 و11 مع متصفح حديث. Windows 7 و8.1 يحتاجان متصفحاً قديماً متوافقاً؛ آخر إصدار Chrome/Edge المتاح لهما هو 109، لذلك قد لا تعمل بعض ميزات اختيار المجلدات أو التخزين. لا يمكن ضمان التوافق الكامل مع متصفحات انتهى دعمها. لا يستطيع الموقع تهيئة الفلاش أو فرض نظام الملفات؛ FAT/FAT32/exFAT تُقرأ إذا ركّبها النظام وسمح المتصفح بالوصول إليها.</div><div class="notice"><b>حدود القياس:</b> الحجم المعروض مجموع ملفات ISO المكتشفة فقط، ولا يمثل المساحة الحرة الكاملة على الفلاش.</div></section>
