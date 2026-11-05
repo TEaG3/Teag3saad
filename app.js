@@ -3,7 +3,19 @@ const $=id=>document.getElementById(id);
 const S={root:null,offline:null,games:[],filter:"all",query:"",logs:[],busy:false,db:null,activeGame:null,catalog:[],catalogStatus:"جارٍ تحميل القاعدة"};
 const isPs1Id=id=>/^[A-Z]{4}-\d{5}$/.test(String(id||"").toUpperCase().replace("_","-"));
 const normalizePs1Id=id=>String(id||"").toUpperCase().replace("_","-");
-const coverUrls=id=>isPs1Id(id)?["https://raw.githubusercontent.com/xlenore/psx-covers/main/covers/default/"+normalizePs1Id(id)+".jpg"]:["https://raw.githubusercontent.com/xlenore/ps2-covers/main/covers/default/"+id.replace("_","-")+".jpg","https://raw.githubusercontent.com/xlenore/ps2-covers/main/covers/default/"+id+".jpg","https://art.gametdb.com/ps2/cover/US/"+id.replace("_","-")+".jpg"];
+function artworkIdentity(id){
+ const value=String(id||"").toUpperCase();
+ if(isPs1Id(value))return {platform:"ps1",serial:normalizePs1Id(value)};
+ const match=value.match(/^([A-Z]{4})[_-](\d{3})\.(\d{2})$/);
+ if(match)return {platform:"ps2",serial:match[1]+"-"+match[2]+match[3]};
+ return null;
+}
+function coverUrls(id){
+ const identity=artworkIdentity(id);
+ if(!identity)return [];
+ const repository=identity.platform==="ps1"?"psx-covers":"ps2-covers";
+ return ["https://raw.githubusercontent.com/xlenore/"+repository+"/main/covers/default/"+identity.serial+".jpg"];
+}
 function msg(t,error=false){const e=$("toast");e.textContent=t;e.className="toast show"+(error?" error":"");clearTimeout(msg.timer);msg.timer=setTimeout(()=>e.className="toast",4000);}
 function log(t){S.logs.unshift({t,at:new Date().toLocaleString("ar-IQ")});$("logs").innerHTML=S.logs.map(x=>'<div class="log-entry">'+esc(x.t)+' <small>— '+esc(x.at)+'</small></div>').join("");}
 function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
@@ -185,28 +197,75 @@ function render(){
  $('csv').disabled=!S.games.length;$('rescan').disabled=!S.root;$('missing').disabled=!S.games.length;$('all').disabled=!S.games.length;
  const rows=S.games.filter(g=>(!S.query||(((g.meta?.title||g.title)+' '+(effectiveId(g)||g.gameId)).toLowerCase().includes(S.query)))&&(S.filter==='all'||(S.filter==='missing'&&(!effectiveId(g)||!g.hasCover||!g.hasIcon))||S.filter===g.format));
  $('games').innerHTML=rows.length?rows.map(g=>{
-  const id=effectiveId(g),displayId=id||g.gameId,cover=id?coverUrls(id)[0]:'';
+  const id=effectiveId(g),displayId=id||g.gameId,cover=g.artworkDataUrl||(id?coverUrls(id)[0]:'');
   const partsCell=g.format==='UL'?('<span class="tag '+(g.ulPartsComplete?'ok':'bad')+'">'+g.ulAvailableParts+'/'+g.ulParts+'</span>'):'—';
   return '<tr><td>'+(cover?'<img class="cover" src="'+cover+'" onerror="this.style.visibility=\'hidden\'" alt="">':'—')+'</td><td>'+esc(g.meta?.title||g.title)+'</td><td class="id">'+esc(displayId)+'</td><td>'+g.format+'</td><td>'+fmt(g.size)+'</td><td>'+partsCell+'</td><td><span class="tag '+(g.hasCover?'ok':'bad')+'">'+(g.hasCover?'متوفر':'ناقص')+'</span></td><td><span class="tag '+(g.hasIcon?'ok':'bad')+'">'+(g.hasIcon?'متوفر':'ناقص')+'</span></td><td><button class="row-action" data-game="'+esc(g.gameId)+'">تفاصيل</button></td></tr>';
  }).join(''):'<tr><td colspan="9" class="empty">لا توجد نتائج.</td></tr>';
 }
 async function fetchArt(id){
+ const identity=artworkIdentity(id);
+ if(!identity)throw new Error("Game ID غير صالح لمصدر الأغلفة.");
+ if(window.saadDesktop?.downloadArtwork){
+  const result=await window.saadDesktop.downloadArtwork(identity);
+  if(!result?.ok||!result.dataUrl)throw new Error(result?.error||"تعذر تنزيل الغلاف من الإنترنت.");
+  const response=await fetch(result.dataUrl);
+  if(!response.ok)throw new Error("تعذر فتح الغلاف المخزن داخل التطبيق.");
+  return await response.blob();
+ }
  if(S.offline){
-  for(const n of [id+".jpg",id+".png",id+"_COV.jpg",id+"_COV.png",id.replace("_","-")+".jpg"]){
+  for(const n of [id+".jpg",id+".png",id+"_COV.jpg",id+"_COV.png",identity.serial+".jpg"]){
    try{const file=await(await S.offline.getFileHandle(n)).getFile();if(file.size)return file;}catch(e){}
   }
  }
+ let lastError="الصورة غير موجودة في مصدر الأغلفة.";
  for(const url of coverUrls(id)){
   try{
-   const r=await fetch(url,{cache:"no-store"});
-   if(!r.ok)continue;
-   const type=(r.headers.get("content-type")||"").toLowerCase();
-   if(!type.startsWith("image/"))continue;
-   const blob=await r.blob();
+   const response=await fetch(url,{cache:"no-store"});
+   if(!response.ok){lastError="مصدر الأغلفة أعاد HTTP "+response.status+".";continue;}
+   const type=(response.headers.get("content-type")||"").toLowerCase();
+   if(!type.startsWith("image/")){lastError="المصدر لم يُرجع صورة.";continue;}
+   const blob=await response.blob();
    if(blob.size)return blob;
-  }catch(e){}
+  }catch(error){lastError=error.message||String(error);}
  }
- return null;
+ throw new Error(lastError);
+}
+async function restoreCachedArtwork(){
+ if(!window.saadDesktop?.getArtwork)return;
+ for(const game of S.games){
+  const identity=artworkIdentity(effectiveId(game));
+  if(!identity)continue;
+  try{
+   const result=await window.saadDesktop.getArtwork(identity);
+   if(result?.ok&&result.dataUrl){game.artworkDataUrl=result.dataUrl;game.hasLocalCover=true;}
+  }catch(error){log("تعذر قراءة الغلاف المحلي "+identity.serial+": "+error.message);}
+ }
+}
+async function downloadArtworkToApp(){
+ if(!window.saadDesktop?.downloadArtwork){msg("تنزيل الأغلفة إلى ذاكرة البرنامج متاح في تطبيق Windows فقط.",true);return;}
+ const list=S.games.filter(game=>artworkIdentity(effectiveId(game)));
+ if(!list.length){msg("لم يتم العثور على ألعاب ذات Game ID صالح. افحص الألعاب أولاً.",true);return;}
+ $("progress").hidden=false;
+ let success=0,failed=0,alreadyCached=0;
+ for(let index=0;index<list.length;index++){
+  const game=list[index],identity=artworkIdentity(effectiveId(game));
+  $("progressText").textContent="تنزيل الغلاف إلى البرنامج: "+game.title;
+  $("progressCount").textContent=(index+1)+" / "+list.length;
+  $("progressBar").style.width=((index+1)/list.length*100)+"%";
+  $("progressDetail").textContent=identity.platform.toUpperCase()+" · "+identity.serial;
+  try{
+   let result=await window.saadDesktop.getArtwork(identity);
+   if(result?.ok)alreadyCached++;
+   else result=await window.saadDesktop.downloadArtwork(identity);
+   if(!result?.ok||!result.dataUrl)throw new Error(result?.error||"لم يُعثر على غلاف لهذا الرقم.");
+   game.artworkDataUrl=result.dataUrl;game.hasLocalCover=true;success++;
+  }catch(error){failed++;log("تعذر غلاف "+identity.serial+": "+error.message);}
+ }
+ render();
+ $("progressText").textContent="اكتمل تنزيل أغلفة البرنامج";
+ $("progressDetail").textContent="جاهزة: "+success+" · فشلت: "+failed+" · من الذاكرة السابقة: "+alreadyCached;
+ log("أغلفة ذاكرة البرنامج: جاهزة "+success+"، فشل "+failed+"، مخزنة مسبقاً "+alreadyCached+".");
+ msg("صور البرنامج: "+success+" جاهزة، "+failed+" غير متاحة.");
 }
 async function ensureWritePermission(){
  if(!S.root)throw new Error("لم يتم اختيار وحدة التخزين.");
@@ -303,7 +362,7 @@ function csv(){
 function view(name){document.querySelectorAll(".view").forEach(x=>x.classList.remove("active"));$(name).classList.add("active");document.querySelectorAll(".nav").forEach(x=>x.classList.toggle("active",x.dataset.view===name));$("viewTitle").textContent=({library:"مكتبة الألعاب",artwork:"إدارة الأغلفة",storage:"تحليل التخزين",reports:"التقارير والسجل"})[name];$("sidebar").classList.remove("open");}
 document.querySelectorAll(".nav").forEach(b=>b.addEventListener("click",()=>view(b.dataset.view)));
 document.querySelectorAll(".filter").forEach(b=>b.addEventListener("click",()=>{S.filter=b.dataset.filter;document.querySelectorAll(".filter").forEach(x=>x.classList.toggle("active",x===b));render();}));
-$("scan").onclick=scan;$("rescan").onclick=scan;$("csv").onclick=csv;$("missing").onclick=()=>download(true);$("all").onclick=()=>download(false);$("search").oninput=e=>{S.query=e.target.value.toLowerCase();render();};$("menu").onclick=()=>$("sidebar").classList.toggle("open");
+$("scan").onclick=scan;$("rescan").onclick=scan;$("csv").onclick=csv;if($("downloadToApp"))$("downloadToApp").onclick=downloadArtworkToApp;$("missing").onclick=()=>download(true);$("all").onclick=()=>download(false);$("search").oninput=e=>{S.query=e.target.value.toLowerCase();render();};$("menu").onclick=()=>$("sidebar").classList.toggle("open");
 $("offline").onclick=async()=>{if(!("showDirectoryPicker"in window)){msg("اختيار مجلد الصور المحلي غير مدعوم في هذا المتصفح؛ يمكنك استخدام الصور المتاحة عبر الإنترنت.",true);return;}try{S.offline=await showDirectoryPicker({mode:"read"});$("offlineName").textContent=S.offline.name;msg("تم اختيار مجلد الصور.");}catch(e){}};
 if("serviceWorker"in navigator&&location.protocol.startsWith("http"))navigator.serviceWorker.register("./sw.js").catch(()=>{});
 
