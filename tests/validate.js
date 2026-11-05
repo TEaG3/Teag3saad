@@ -72,7 +72,7 @@ assert(desktopWorkflow.includes("npm run smoke")&&desktopMain.includes("--smoke-
 assert(desktopWorkflow.includes("WINDOWS_CERTIFICATE_BASE64")&&desktopWorkflow.includes("Get-AuthenticodeSignature"),"optional Authenticode signing and verification missing");
 assert(!downloadPage.includes("Portable"),"download page must not mention Portable edition");
 assert(downloadPage.includes("Saad-PS2-Setup-1.1.3.exe"),"download page must link Windows Setup installer");
-assert(downloadPage.includes("SmartScreen")&&downloadPage.includes("متطلبات التشغيل"),"download page must explain Windows security and requirements");
+assert(!/SmartScreen|متطلبات التشغيل|Windows 7|Windows 8|Windows 10|Windows 11/.test(downloadPage),"download page should avoid technical setup and compatibility clutter");
 assert(desktopWorkflow.includes("softprops/action-gh-release@v3.0.3")&&desktopWorkflow.includes("tag_name: desktop-latest")&&desktopWorkflow.includes("make_latest: true")&&desktopWorkflow.includes("Saad-PS2-Setup-1.1.3.exe"),"successful Windows Setup builds must publish the versioned installer");
 const ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(x=>x[1]);
 assert.equal(new Set(ids).size,ids.length,"duplicate HTML IDs");
@@ -121,7 +121,6 @@ assert(engine.includes("createImageBitmap(file)"),"artwork inspection must decod
 assert(!app.includes("\\nif("),"literal escaped newline broke app.js syntax");
 assert((app.match(/fallbackFiles.*addEventListener\("change"/g)||[]).length===1,"fallback handlers must be unique");
 assert(sw.includes("saad-ps2-v23"),"service worker cache must be bumped");
-assert(html.includes("توافق أنظمة Windows"),"Windows compatibility note missing");
 assert(app.includes('identity.platform==="ps1"?"psx-covers":"ps2-covers"')&&app.includes('"https://raw.githubusercontent.com/xlenore/"+repository+"/main/covers/default/"'),"platform-specific cover source selection missing");
 assert(app.includes("function valid(id){const value=String(id||\"\").toUpperCase();return /^[A-Z]{4}_\\d{3}\\.\\d{2}$/.test(value.replace(\"-\",\"_\"))||isPs1Id(value);}"),"PS1 serial validation missing");
 assert(app.includes("normalizePs1Id"),"PS1 serial normalization missing");
@@ -227,4 +226,5 @@ assert(app.includes("const exact=matches.filter(v=>normalizeCatalogTitle(v.title
 assert(app.includes('if(matches.length>1)return "UNKNOWN"'),"ambiguous platform IDs must remain unresolved");
 assert(app.includes("if(S.catalogReady)await S.catalogReady"),"scans must wait for catalog readiness");
 console.log("PASS: JS syntax, populated catalog, PS1/PS2 serial matching, diagnostics, dependency hardening and release workflow.");
+
 
