@@ -132,6 +132,7 @@ async function toJpeg(blob){return convertArt(blob,"image/jpeg",140,200,false);}
 async function toPng(blob){return convertArt(blob,"image/png",64,64,true);}
 async function download(onlyMissing){
  if(!S.root){msg("اختر وحدة التخزين أولاً.",true);return;}
+ try{if(typeof S.root.queryPermission==="function"){let p=await S.root.queryPermission({mode:"readwrite"});if(p!=="granted")p=await S.root.requestPermission({mode:"readwrite"});if(p!=="granted")throw new Error("لم تمنح صلاحية الكتابة على وحدة التخزين.");}}catch(e){msg("تعذرت صلاحية الكتابة: "+e.message,true);return;}
  const list=S.games.filter(g=>valid(effectiveId(g))&&(!onlyMissing||!g.hasCover||!g.hasIcon));
  if(!list.length){msg("لا توجد صور قابلة للحفظ. لألعاب UL أدخل Game ID الصحيح من تفاصيل اللعبة أولاً.",true);return;}
  const art=await S.root.getDirectoryHandle("ART",{create:true});
@@ -235,3 +236,21 @@ $("restore").onclick=()=>$("restoreFile").click();
 $("restoreFile").onchange=e=>{if(e.target.files[0])restoreDb(e.target.files[0]);e.target.value="";};
 
 render();
+function renderStorageCapabilities(){
+ const c=window.PS2Database?.storageCapabilities();if(!c)return;
+ const e=$("storageSupport");e.innerHTML="<b>دعم وحدات التخزين:</b> "+esc(c.message)+"<br><b>الوصول المباشر:</b> "+(c.write?"قراءة وكتابة بعد موافقة المستخدم":"غير متاح في هذا المتصفح")+(c.ios?" · جهاز iPad/iPhone":"");
+}
+async function runDiagnostics(){
+ const out=$("diagnosticResults");out.hidden=false;out.textContent="جارٍ فحص المكتبة ومجلد ART...";
+ const report=window.PS2Database.inspectLibrary(S.games);
+ let art={files:0,covers:0,icons:0,invalid:[],missing:[]};
+ if(S.root){try{art=await window.PS2Database.inspectArt(S.root);}catch(e){art.missing.push("تعذر فحص ART: "+e.message);}}
+ const lines=["عدد السجلات: "+report.total,"سجلات بمعرّف صالح: "+report.identified,"سجلات بلا Game ID: "+report.missingId,"معرّفات مكررة: "+report.duplicateIds,"ألعاب UL غير المكتملة: "+report.incompleteUl,"ملفات ART: "+art.files+" · أغلفة: "+art.covers+" · أيقونات: "+art.icons,"صور بمقاسات خاطئة أو تالفة: "+art.invalid.length];
+ if(art.missing.length)lines.push(...art.missing);
+ if(art.invalid.length)lines.push(...art.invalid.slice(0,30).map(x=>x.name+": "+x.actual+" (المطلوب "+x.expected+")"));
+ if(report.issues.length)lines.push(...report.issues.slice(0,50).map(x=>x.title+": "+x.message));
+ if(!S.games.length)lines.push("لم يتم فحص وحدة تخزين بعد؛ اختر USB أولاً.");
+ out.textContent=lines.join("\n");log("فحص سلامة المكتبة: "+report.issues.length+" ملاحظة، و"+art.invalid.length+" صورة تحتاج تصحيحاً.");
+}
+if($("runDiagnostics"))$("runDiagnostics").onclick=runDiagnostics;
+renderStorageCapabilities();
