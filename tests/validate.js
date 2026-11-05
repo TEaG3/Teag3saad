@@ -114,7 +114,7 @@ assert(engine.includes("valid:[]"),"artwork inspection must return verified file
 assert(engine.includes("createImageBitmap(file)"),"artwork inspection must decode image content");
 assert(!app.includes("\\nif("),"literal escaped newline broke app.js syntax");
 assert((app.match(/fallbackFiles.*addEventListener\("change"/g)||[]).length===1,"fallback handlers must be unique");
-assert(sw.includes("saad-ps2-v20"),"service worker cache must be bumped");
+assert(sw.includes("saad-ps2-v21"),"service worker cache must be bumped");
 assert(html.includes("توافق أنظمة Windows"),"Windows compatibility note missing");
 assert(app.includes('identity.platform==="ps1"?"psx-covers":"ps2-covers"')&&app.includes('"https://raw.githubusercontent.com/xlenore/"+repository+"/main/covers/default/"'),"platform-specific cover source selection missing");
 assert(app.includes("function valid(id){const value=String(id||\"\").toUpperCase();return /^[A-Z]{4}_\\d{3}\\.\\d{2}$/.test(value.replace(\"-\",\"_\"))||isPs1Id(value);}"),"PS1 serial validation missing");
@@ -140,7 +140,7 @@ assert(catalog.counts.PS1>=100&&catalog.counts.PS2>=100,"central catalog must co
 assert(catalog.games.every(g=>["PS1","PS2"].includes(g.platform)&&/^[A-Z]{4}-\d{5}$/.test(g.serial)&&typeof g.title==="string"&&g.title.length>0),"catalog records must have valid platform, serial and title");
 assert(new Set(catalog.games.map(g=>g.platform+":"+g.serial)).size===catalog.games.length,"catalog serials must be unique per platform");
 assert(app.includes('split("\\0")'),"UL config must split null-terminated fields");
-assert(sw.includes("saad-ps2-v20"),"service worker cache must be bumped after artwork export changes");
+assert(sw.includes("saad-ps2-v21"),"service worker cache must be bumped after artwork export changes");
 assert(app.includes("scanGameTree"),"recursive game scanner missing");
 assert(app.includes("extractDiscId"),"disc serial extractor missing");
 assert(app.includes("await download(true)"),"automatic missing-art download missing");
@@ -148,6 +148,36 @@ assert(html.includes('id="ps1Count"'),"PS1 count display missing");
 
 assert.equal((app.match(/resolvePlatform\(id,ext,title\)/g)||[]).length,2,"both scanners must use title-aware catalog platform resolution");
 assert(app.includes("function resolvePlatform(id,format,title)"),"title-aware catalog-first platform resolver missing");
+assert(app.includes("async function buildCueGame(cueEntry,entries,pathOf)"),"CUE descriptor parser missing");
+assert(app.includes("cueText.matchAll"),"CUE FILE track references must be parsed");
+assert(app.includes('format:"CUE"'),"multi-track disc must be represented as one CUE game");
+assert(app.includes("const consumedBins=new Set()"),"CUE-referenced BIN tracks must be excluded from duplicate game entries");
+assert(app.includes("const cueFiles=gameFiles.filter"),"manual file selection must group CUE and BIN tracks");
+
+const cueStart=app.indexOf("async function buildCueGame(cueEntry,entries,pathOf){");
+const cueEnd=app.indexOf("async function scanGameTree(dir,prefix){",cueStart);
+assert(cueStart>=0&&cueEnd>cueStart,"CUE grouping helper must be isolated for regression tests");
+const cueSandbox={
+ localKey:(prefix,value)=>prefix+"_"+value,
+ extractDiscId:async file=>/Track 1/i.test(file.name)?"SLUS_004.02":null,
+ resolvePlatform:(id,format,title)=>id==="SLUS_004.02"&&format==="CUE"&&title==="Tekken 3 (USA)"?"PS1":"UNKNOWN"
+};
+vm.runInNewContext(app.slice(cueStart,cueEnd)+"\nthis.buildCueGame=buildCueGame;",cueSandbox);
+const cueMock={name:"Tekken 3 (USA).cue",size:12,slice:()=>({text:async()=>'FILE "Tekken 3 (USA) (Track 1).bin" BINARY\nFILE "Tekken 3 (USA) (Track 2).bin" BINARY\nFILE "Tekken 3 (USA) (Track 3).bin" BINARY'})};
+const trackMocks=[
+ {name:"Tekken 3 (USA) (Track 1).bin",size:100},
+ {name:"Tekken 3 (USA) (Track 2).bin",size:20},
+ {name:"Tekken 3 (USA) (Track 3).bin",size:30}
+];
+(async()=>{
+ const cueGame=await cueSandbox.buildCueGame(cueMock,[cueMock,...trackMocks],e=>e.name);
+ assert.equal(cueGame.title,"Tekken 3 (USA)");
+ assert.equal(cueGame.platform,"PS1");
+ assert.equal(cueGame.format,"CUE");
+ assert.equal(cueGame.size,162,"CUE game size must include all referenced BIN tracks");
+ assert.equal(cueGame.discFiles.length,4,"one CUE plus all referenced tracks must form one game");
+})().catch(error=>{console.error(error);process.exitCode=1;});
+
 assert(app.includes("function normalizeCatalogTitle(value)"),"catalog title normalization for duplicate serials missing");
 assert(app.includes("function catalogSerial(value)"),"catalog matching must normalize dotted PS2 serials");
 assert(app.includes("function catalogOplId(record)"),"PS2 source serials must convert to OPL Game IDs");

@@ -131,20 +131,71 @@ async function extractDiscId(file){
  }catch(e){}
  return null;
 }
+async function buildCueGame(cueEntry,entries,pathOf){
+ const cueFile=cueEntry.getFile?await cueEntry.getFile():cueEntry;
+ const cueName=cueEntry.name||cueFile.name;
+ const cuePath=pathOf?pathOf(cueEntry):cueName;
+ const cueText=await cueFile.slice(0,1048576).text();
+ const refs=[];
+ for(const match of cueText.matchAll(/^\s*FILE\s+(?:"([^"]+)"|(\S+))\s+/gim)){
+  const raw=(match[1]||match[2]||"").replace(/\\/g,"/");
+  const base=raw.split("/").pop().toLowerCase();
+  const found=entries.find(e=>(e.name||"").toLowerCase()===base);
+  if(found&&!refs.includes(found))refs.push(found);
+ }
+ const title=cueName.replace(/\.cue$/i,"").replace(/\s*\(track\s*\d+\)\s*$/i,"").trim();
+ if(!refs.length){
+  const stem=title.toLowerCase();
+  for(const entry of entries){
+   if(entry===cueEntry||entry.kind==="directory"||!/\.bin$/i.test(entry.name||""))continue;
+   const binStem=entry.name.replace(/\.bin$/i,"").replace(/\s*\(track\s*\d+\)\s*$/i,"").trim().toLowerCase();
+   if(binStem===stem)refs.push(entry);
+  }
+ }
+ let id=await extractDiscId(cueFile);
+ const referencedPaths=[cuePath],seen=new Set([cueEntry]);
+ let size=cueFile.size||0;
+ for(const entry of refs){
+  if(seen.has(entry))continue;
+  seen.add(entry);
+  const file=entry.getFile?await entry.getFile():entry;
+  size+=file.size||0;
+  referencedPaths.push(pathOf?pathOf(entry):entry.name);
+  if(!id)id=await extractDiscId(file);
+ }
+ if(!id)id=idFromName(title);
+ const platform=resolvePlatform(id,"CUE",title);
+ return {title,recordKey:localKey("LIB",cuePath.toLowerCase()),gameId:id||localKey("FILE",cuePath.toLowerCase()),oplGameId:id||null,format:"CUE",platform,size,hasCover:false,hasIcon:false,source:referencedPaths.join(" | "),discFiles:referencedPaths};
+}
 async function scanGameTree(dir,prefix){
  const out=[],entries=[];for await(const ent of dir.values())entries.push(ent);
- const cueBases=new Set(entries.filter(e=>e.kind==="file"&&/\.cue$/i.test(e.name)).map(e=>e.name.replace(/\.cue$/i,"").toLowerCase()));
+ const cueEntries=entries.filter(e=>e.kind==="file"&&/\.cue$/i.test(e.name));
+ const consumedBins=new Set();
+ for(const cue of cueEntries){
+  try{
+   const game=await buildCueGame(cue,entries,e=>(prefix?prefix+"/":"")+e.name);
+   for(const entry of entries){
+    if(entry.kind!=="file"||!/\.bin$/i.test(entry.name))continue;
+    const stem=entry.name.replace(/\.bin$/i,"").replace(/\s*\(track\s*\d+\)\s*$/i,"").trim().toLowerCase();
+    const cueStem=cue.name.replace(/\.cue$/i,"").replace(/\s*\(track\s*\d+\)\s*$/i,"").trim().toLowerCase();
+    if(stem===cueStem||(game.discFiles||[]).some(p=>p.toLowerCase().endsWith("/"+entry.name.toLowerCase())||p.toLowerCase()===entry.name.toLowerCase()))consumedBins.add(entry);
+   }
+   out.push(game);
+  }catch(e){log("تعذر تحليل ملف CUE "+cue.name+": "+e.message);}
+ }
  for(const ent of entries){
   if(ent.kind==="directory"){
    if(ent.name.toUpperCase()==="ART")continue;
    out.push(...await scanGameTree(ent,prefix?prefix+"/"+ent.name:ent.name));continue;
   }
-  if(ent.kind!=="file"||!/\.(iso|zso|bin|cue|img|chd|pbp|vcd)$/i.test(ent.name))continue;
-  const ext=ent.name.split(".").pop().toLowerCase(),base=ent.name.replace(/\.[^.]+$/,"").toLowerCase();
-  if(ext==="bin"&&cueBases.has(base))continue;
+  if(ent.kind!=="file"||!/\.(iso|zso|bin|img|chd|pbp|vcd)$/i.test(ent.name))continue;
+  if(consumedBins.has(ent))continue;
+  if(/\.bin$/i.test(ent.name)){
+   const stem=ent.name.replace(/\.bin$/i,"").replace(/\s*\(track\s*\d+\)\s*$/i,"").trim().toLowerCase();
+   if(cueEntries.some(c=>c.name.replace(/\.cue$/i,"").replace(/\s*\(track\s*\d+\)\s*$/i,"").trim().toLowerCase()===stem))continue;
+  }
   try{
-   let file=await ent.getFile(),id=await extractDiscId(file);
-   if(ext==="cue"&&!id){const companion=entries.find(e=>e.kind==="file"&&e.name.toLowerCase()===base+".bin");if(companion){file=await companion.getFile();id=await extractDiscId(file);}}
+   const file=await ent.getFile(),id=await extractDiscId(file),ext=ent.name.split(".").pop().toLowerCase();
    const title=ent.name.replace(/\.[^.]+$/,"");
    const platform=resolvePlatform(id,ext,title);
    const path=(prefix?prefix+"/":"")+ent.name;
@@ -161,11 +212,28 @@ async function scanSelectedFiles(fileList){
  $("driveInfo").textContent="قراءة الملفات وتحليلها...";
  $("games").innerHTML='<tr><td colspan="9" class="empty">جارٍ تحليل الملفات...</td></tr>';
   const gameFiles=files.filter(function(f){return /\.(iso|zso|bin|cue|img|chd|pbp|vcd)$/i.test(f.name);});
+ const cueFiles=gameFiles.filter(function(f){return /\.cue$/i.test(f.name);});
+ const consumed=new Set();
+ for(const cue of cueFiles){
+  try{
+   const game=await buildCueGame(cue,gameFiles,pathOf);
+   S.games.push(Object.assign(game,{folder:(pathOf(cue).split("/").slice(-2,-1)[0]||"ROOT")}));
+   const discPaths=new Set((game.discFiles||[]).map(p=>p.toLowerCase()));
+   gameFiles.forEach(function(f){
+    if(f===cue)return;
+    const path=pathOf(f).toLowerCase();
+    const stem=f.name.replace(/\.bin$/i,"").replace(/\s*\(track\s*\d+\)\s*$/i,"").trim().toLowerCase();
+    const cueStem=cue.name.replace(/\.cue$/i,"").replace(/\s*\(track\s*\d+\)\s*$/i,"").trim().toLowerCase();
+    if(discPaths.has(path)||discPaths.has(f.name.toLowerCase())||(/\.bin$/i.test(f.name)&&stem===cueStem))consumed.add(f);
+   });
+  }catch(e){log("تعذر تحليل ملف CUE "+cue.name+": "+e.message);}
+ }
  for(let i=0;i<gameFiles.length;i++){
   const f=gameFiles[i];
+  if(/\.cue$/i.test(f.name)||consumed.has(f))continue;
   try{
-    const path=pathOf(f),parts=path.split("/"),id=await extractDiscId(f),ext=f.name.split(".").pop().toUpperCase(),title=f.name.replace(/\.[^.]+$/,""),platform=resolvePlatform(id,ext,title);
-    S.games.push({title,recordKey:localKey("LIB",path.toLowerCase()),gameId:id||localKey("FILE",path.toLowerCase()),oplGameId:id||null,format:ext,platform,size:f.size,hasCover:false,hasIcon:false,source:path,folder:parts.length>1?parts[parts.length-2]:"ROOT"});
+   const path=pathOf(f),parts=path.split("/"),id=await extractDiscId(f),ext=f.name.split(".").pop().toUpperCase(),title=f.name.replace(/\.[^.]+$/,""),platform=resolvePlatform(id,ext,title);
+   S.games.push({title,recordKey:localKey("LIB",path.toLowerCase()),gameId:id||localKey("FILE",path.toLowerCase()),oplGameId:id||null,format:ext,platform,size:f.size,hasCover:false,hasIcon:false,source:path,folder:parts.length>1?parts[parts.length-2]:"ROOT"});
   }catch(e){log("تعذر تحليل "+f.name+": "+e.message);}
  }
  const ul=files.find(function(f){return f.name.toLowerCase()==="ul.cfg";});
