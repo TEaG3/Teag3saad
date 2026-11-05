@@ -38,7 +38,7 @@ assert(app.includes("await verifySavedArt(art,iconName,64,64)"),"icon verificati
 assert(html.includes('src="./ps2-database.js"'),"database engine must load before app");
 assert(html.includes('id="runDiagnostics"'),"diagnostics button missing");
 assert(html.includes('id="downloadToApp"'),"online-to-OPL ART export button missing");
-assert(html.includes('id="downloadWindowsApp" href="./downloads.html"'),"website Windows download link must remain available");
+assert(html.includes('id="downloadWindowsApp"')&&html.includes('href="./downloads.html"'),"website Windows download link must remain available");
 assert(app.includes('if(window.saadDesktop?.isDesktop)document.getElementById("downloadWindowsApp")?.remove();'),"Windows download link must be hidden only in the desktop app");
 assert(desktopPreload.includes("isDesktop: true"),"Electron preload must identify the desktop runtime");
 assert(app.includes("await download(false)"),"full artwork export button must write all covers to ART");
