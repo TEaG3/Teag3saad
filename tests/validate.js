@@ -42,4 +42,10 @@ assert(!app.includes("\\nif("),"literal escaped newline broke app.js syntax");
 assert((app.match(/fallbackFiles.*addEventListener\("change"/g)||[]).length===1,"fallback handlers must be unique");
 assert(sw.includes("saad-ps2-v6"),"service worker cache must be bumped");
 assert(html.includes("توافق أنظمة Windows"),"Windows compatibility note missing");
+
+assert(app.includes('replace(/\\\\\\\\/g,"/")'),"selected-file path normalization must handle Windows separators");
+assert(app.includes('return /\\\\.(iso|zso)$/i.test(f.name);')||app.includes('return /\\.(iso|zso)$/i.test(f.name);'),"selected ISO/ZSO extension matcher missing");
+assert(app.includes('split("\\0")'),"UL config must split null-terminated fields");
+assert(sw.includes("saad-ps2-v7"),"service worker cache must be bumped after app changes");
+
 console.log("PASS: JS syntax, manifest, static DOM references, database ID/region checks, duplicate and UL diagnostics.");
