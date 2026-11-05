@@ -1,6 +1,21 @@
 name: Build Saad PS2 Windows EXE
 
 on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "desktop/**"
+      - "index.html"
+      - "downloads.html"
+      - "app.js"
+      - "styles.css"
+      - "ps2-database.js"
+      - "manifest.webmanifest"
+      - "sw.js"
+      - "data/**"
+      - "scripts/**"
+      - "tests/**"
+      - ".github/workflows/windows-exe.yml"
   push:
     branches: [main]
     paths:
@@ -26,7 +41,52 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  validate-windows-pull-request:
+    if: github.event_name == 'pull_request'
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout pull request source
+        uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Setup Node.js
+        uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Build a fresh PS1/PS2 catalog
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/update-game-catalog.cjs
+      - name: Install locked desktop dependencies
+        working-directory: desktop
+        run: npm ci
+      - name: Audit desktop build dependencies
+        working-directory: desktop
+        run: npm audit --audit-level=moderate
+      - name: Validate app and generated catalog
+        run: node tests/validate.js
+      - name: Stage desktop application
+        working-directory: desktop
+        run: npm run stage
+      - name: Smoke-test Electron startup
+        working-directory: desktop
+        run: npm run smoke
+      - name: Build Windows installer without publishing a release
+        working-directory: desktop
+        run: npm run dist:setup
+      - name: Upload pull-request installer for inspection
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: Saad-PS2-Windows-PR-${{ github.event.pull_request.number }}
+          path: desktop/release/Saad-PS2-Setup-1.1.1.exe
+          if-no-files-found: error
+          retention-days: 7
+
   build-windows:
+    if: github.event_name != 'pull_request'
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -37,6 +97,8 @@ jobs:
           node-version: 24
           package-manager-cache: false
       - name: Update central PS1/PS2 game catalog
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/update-game-catalog.cjs
       - name: Generate or refresh npm lockfile
         id: lockfile

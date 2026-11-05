@@ -46,24 +46,48 @@ function mapTitleMap(payload, platform) {
 }
 
 async function fetchJson(url) {
-  const response = await fetch(url, {
-    headers: {
-      "Accept": "application/vnd.github+json",
-      "User-Agent": "Saad-PS2-Ultimate-Catalog-Sync"
-    },
-    redirect: "follow"
-  });
-  if (!response.ok) throw new Error("HTTP " + response.status + " while fetching " + url);
-  return response.json();
+  const headers = {
+    "Accept": "application/vnd.github+json",
+    "User-Agent": "Saad-PS2-Ultimate-Catalog-Sync"
+  };
+  // Use the Actions token only for GitHub API calls; never forward it to release asset hosts.
+  if (new URL(url).hostname === "api.github.com") {
+    const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+    if (token) headers.Authorization = "Bearer " + token;
+  }
+  let lastError;
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    try {
+      const response = await fetch(url, {
+        headers,
+        redirect: "follow",
+        signal: AbortSignal.timeout(45000)
+      });
+      if (!response.ok) {
+        const detail = response.headers.get("x-ratelimit-remaining") === "0" ? " (GitHub API rate limit exhausted)" : "";
+        throw new Error("HTTP " + response.status + detail + " while fetching " + url);
+      }
+      return await response.json();
+    } catch (error) {
+      lastError = error;
+      if (attempt < 4) await new Promise(resolve => setTimeout(resolve, attempt * 1500));
+    }
+  }
+  throw lastError;
 }
 
 async function fetchSource(source) {
-  const release = await fetchJson("https://api.github.com/repos/" + source.repository + "/releases/latest");
+  const endpoint = "https://api.github.com/repos/" + source.repository + "/releases/latest";
+  const release = await fetchJson(endpoint);
   const asset = (release.assets || []).find(item => item.name === source.assetName);
-  if (!asset?.browser_download_url) throw new Error("Source release has no " + source.assetName);
+  if (!asset?.browser_download_url) {
+    throw new Error(source.repository + " latest release " + (release.tag_name || "(untagged)") + " has no " + source.assetName +
+      ". Available assets: " + (release.assets || []).map(item => item.name).join(", "));
+  }
   const payload = await fetchJson(asset.browser_download_url);
   const games = mapTitleMap(payload, source.platform);
   if (games.length < 100) throw new Error(source.platform + " title source returned only " + games.length + " valid records.");
+  console.log(source.platform + " source OK: " + games.length + " records from " + release.tag_name);
   return { release: release.tag_name, asset: source.assetName, url: asset.browser_download_url, games };
 }
 
