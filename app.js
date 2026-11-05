@@ -188,7 +188,7 @@ async function scanGameTree(dir,prefix){
    if(ent.name.toUpperCase()==="ART")continue;
    out.push(...await scanGameTree(ent,prefix?prefix+"/"+ent.name:ent.name));continue;
   }
-  if(ent.kind!=="file"||!/\\.(iso|zso|bin|img|chd|pbp|vcd)$/i.test(ent.name))continue;
+  if(ent.kind!=="file"||!/\.(iso|zso|bin|img|chd|pbp|vcd)$/i.test(ent.name))continue;
   if(consumedBins.has(ent))continue;
   if(/\.bin$/i.test(ent.name)){
    const stem=ent.name.replace(/\.bin$/i,"").replace(/\s*\(track\s*\d+\)\s*$/i,"").trim().toLowerCase();
