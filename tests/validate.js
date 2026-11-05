@@ -38,15 +38,20 @@ assert(app.includes("await handle.getFile()")&&app.includes("readBack[i]!==paylo
 assert(app.includes("await S.root.removeEntry(name)"),"USB probe must delete its temporary file");
 assert(app.includes("async function verifySavedArt"),"saved artwork read-back verification missing");
 assert(app.includes("await verifySavedArt(art,coverName,140,200)"),"cover verification after saving missing");
-assert(app.includes("await verifySavedArt(art,iconName,64,64)"),"icon verification after saving missing");
+assert(app.includes("await verifySavedArt(icons,iconName,64,64)"),"icon verification must use ICONS folder");
 assert(html.includes('src="./ps2-database.js"'),"database engine must load before app");
 assert(html.includes('id="runDiagnostics"'),"diagnostics button missing");
-assert(html.includes('id="downloadToApp"'),"online-to-OPL ART export button missing");
+assert(html.includes('id="missing"')&&html.includes('id="all"'),"simple artwork download actions missing");
 assert(html.includes('id="downloadWindowsApp"')&&html.includes('href="./downloads.html"'),"website Windows download link must remain available");
 assert(app.includes('if(window.saadDesktop?.isDesktop)document.getElementById("downloadWindowsApp")?.remove();'),"Windows download link must be hidden only in the desktop app");
 assert(desktopPreload.includes("isDesktop: true"),"Electron preload must identify the desktop runtime");
 assert(app.includes("await download(false)"),"full artwork export button must write all covers to ART");
-assert(app.includes('const coverName=id+"_COV.jpg",iconName=id+"_ICO.png"'),"OPL ART filenames must use Game ID suffixes");
+assert(app.includes('const coverName=id+"_COV.jpg",iconName=id+"_ICO.png"'),"OPL artwork filenames must use Game ID suffixes");
+assert(app.includes('getDirectoryHandle("ICONS",{create:true})'),"icon folder creation missing");
+assert(app.includes("async function verifyUsbWriteAccess()"),"preflight USB write verification missing");
+assert(app.includes('verified.has("ICONS/"+id+"_ICO.PNG")'),"icon verification must read ICONS folder");
+assert(engine.includes('folderName of ["ART","ICONS"]'),"artwork inspector must inspect both folders");
+assert(engine.includes("legacyIcons"),"legacy icons in ART must be reported");
 assert(html.includes('id="runUsbTest"'),"real USB write/read test button missing");
 assert(html.includes('id="usbTestResults"'),"USB test result panel missing");
 assert(sw.includes("./ps2-database.js")&&sw.includes("./downloads.html"),"service worker must cache database engine and download page");
@@ -66,9 +71,9 @@ assert(desktopWorkflow.includes("npm ci")&&desktopWorkflow.includes("npm audit -
 assert(desktopWorkflow.includes("npm run smoke")&&desktopMain.includes("--smoke-test"),"Windows workflow must smoke-test Electron startup");
 assert(desktopWorkflow.includes("WINDOWS_CERTIFICATE_BASE64")&&desktopWorkflow.includes("Get-AuthenticodeSignature"),"optional Authenticode signing and verification missing");
 assert(!downloadPage.includes("Portable"),"download page must not mention Portable edition");
-assert(downloadPage.includes("Saad-PS2-Setup-1.1.1.exe"),"download page must link Windows Setup installer");
+assert(downloadPage.includes("Saad-PS2-Setup-1.1.2.exe"),"download page must link Windows Setup installer");
 assert(downloadPage.includes("SmartScreen")&&downloadPage.includes("متطلبات التشغيل"),"download page must explain Windows security and requirements");
-assert(desktopWorkflow.includes("softprops/action-gh-release@v3.0.3")&&desktopWorkflow.includes("tag_name: desktop-latest")&&desktopWorkflow.includes("make_latest: true")&&desktopWorkflow.includes("Saad-PS2-Setup-1.1.1.exe"),"successful Windows Setup builds must publish the versioned installer");
+assert(desktopWorkflow.includes("softprops/action-gh-release@v3.0.3")&&desktopWorkflow.includes("tag_name: desktop-latest")&&desktopWorkflow.includes("make_latest: true")&&desktopWorkflow.includes("Saad-PS2-Setup-1.1.2.exe"),"successful Windows Setup builds must publish the versioned installer");
 const ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(x=>x[1]);
 assert.equal(new Set(ids).size,ids.length,"duplicate HTML IDs");
 const refs=[...app.matchAll(/\$\("([^"]+)"\)/g)].map(x=>x[1]);
@@ -111,10 +116,11 @@ const formatReport=db.inspectLibrary(["ISO","ZSO","UL","VCD","BIN","CUE","IMG","
 assert.equal(formatReport.issues.filter(x=>x.type==="format").length,0,"all supported disc image formats must be recognized");
 assert(css.includes("#diagnosticResults,#usbTestResults"),"USB and artwork diagnostics styles missing");
 assert(engine.includes("valid:[]"),"artwork inspection must return verified filenames");
+assert(engine.includes("legacyIcons:0"),"legacy icon migration report missing");
 assert(engine.includes("createImageBitmap(file)"),"artwork inspection must decode image content");
 assert(!app.includes("\\nif("),"literal escaped newline broke app.js syntax");
 assert((app.match(/fallbackFiles.*addEventListener\("change"/g)||[]).length===1,"fallback handlers must be unique");
-assert(sw.includes("saad-ps2-v21"),"service worker cache must be bumped");
+assert(sw.includes("saad-ps2-v22"),"service worker cache must be bumped");
 assert(html.includes("توافق أنظمة Windows"),"Windows compatibility note missing");
 assert(app.includes('identity.platform==="ps1"?"psx-covers":"ps2-covers"')&&app.includes('"https://raw.githubusercontent.com/xlenore/"+repository+"/main/covers/default/"'),"platform-specific cover source selection missing");
 assert(app.includes("function valid(id){const value=String(id||\"\").toUpperCase();return /^[A-Z]{4}_\\d{3}\\.\\d{2}$/.test(value.replace(\"-\",\"_\"))||isPs1Id(value);}"),"PS1 serial validation missing");
@@ -199,7 +205,7 @@ assert.equal(resolverSandbox.resolvePlatform("SLUS_004.02","BIN","Tekken 3 (USA)
 assert.equal(resolverSandbox.resolvePlatform("SCUS_949.00","CUE"),"UNKNOWN","ambiguous serial without title evidence must remain unknown");
 assert.equal(resolverSandbox.resolvePlatform("SLPS_200.15","ISO","Tekken Tag Tournament"),"PS2","unique PS2 catalog serial must remain PS2");
 
-assert(desktopPackage.version==="1.1.1","desktop release version mismatch");
+assert(desktopPackage.version==="1.1.2","desktop release version mismatch");
 assert(desktopPackage.devDependencies.electron==="45.2.3","Electron runtime version mismatch");
 assert(desktopPackage.devDependencies["electron-builder"]==="26.18.1","electron-builder version mismatch");
 assert(desktopPackage.overrides.tar==="7.5.22","tar security override missing");
