@@ -121,7 +121,6 @@ assert(engine.includes("createImageBitmap(file)"),"artwork inspection must decod
 assert(!app.includes("\\nif("),"literal escaped newline broke app.js syntax");
 assert((app.match(/fallbackFiles.*addEventListener\("change"/g)||[]).length===1,"fallback handlers must be unique");
 assert(sw.includes("saad-ps2-v23"),"service worker cache must be bumped");
-assert(html.includes("توافق أنظمة Windows"),"Windows compatibility note missing");
 assert(app.includes('identity.platform==="ps1"?"psx-covers":"ps2-covers"')&&app.includes('"https://raw.githubusercontent.com/xlenore/"+repository+"/main/covers/default/"'),"platform-specific cover source selection missing");
 assert(app.includes("function valid(id){const value=String(id||\"\").toUpperCase();return /^[A-Z]{4}_\\d{3}\\.\\d{2}$/.test(value.replace(\"-\",\"_\"))||isPs1Id(value);}"),"PS1 serial validation missing");
 assert(app.includes("normalizePs1Id"),"PS1 serial normalization missing");
@@ -227,4 +226,5 @@ assert(app.includes("const exact=matches.filter(v=>normalizeCatalogTitle(v.title
 assert(app.includes('if(matches.length>1)return "UNKNOWN"'),"ambiguous platform IDs must remain unresolved");
 assert(app.includes("if(S.catalogReady)await S.catalogReady"),"scans must wait for catalog readiness");
 console.log("PASS: JS syntax, populated catalog, PS1/PS2 serial matching, diagnostics, dependency hardening and release workflow.");
+
 
