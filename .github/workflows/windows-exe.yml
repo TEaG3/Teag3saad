@@ -1,0 +1,48 @@
+name: Build Saad PS2 Windows EXE
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "desktop/**"
+      - "index.html"
+      - "app.js"
+      - "styles.css"
+      - "ps2-database.js"
+      - "manifest.webmanifest"
+      - "sw.js"
+      - "data/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-exe-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package.json
+      - name: Install desktop build dependencies
+        working-directory: desktop
+        run: npm install
+      - name: Build Portable and Setup EXE
+        working-directory: desktop
+        run: npm run dist:win
+      - name: Upload Windows installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: Saad-PS2-Windows-EXE
+          path: desktop/release/*.exe
+          if-no-files-found: error
+          retention-days: 30
