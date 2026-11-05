@@ -22,8 +22,8 @@ const downloadPage=readFile("downloads.html");
 new Function(app);
 new Function(sw);
 new Function(engine);
-assert(app.includes("function artworkIdentity(id)"),"artwork serial normalization missing");
-assert(app.includes('serial:match[1]+"-"+match[2]+match[3]'),"PS2 serial dot-to-five-digit conversion missing");
+assert(app.includes("function artworkIdentity(id,platformHint)"),"artwork serial normalization missing");
+assert(app.includes('return dotted[1]+"-"+dotted[2]+dotted[3]'),"PS2 serial dot-to-five-digit conversion missing");
 assert(app.includes("window.saadDesktop?.downloadArtwork"),"Windows native artwork downloader is not connected");
 assert(app.includes("async function downloadArtworkToApp()"),"in-app artwork cache download flow missing");
 assert(app.includes("async function restoreCachedArtwork()"),"cached artwork restore on scan missing");
@@ -114,7 +114,7 @@ assert(engine.includes("valid:[]"),"artwork inspection must return verified file
 assert(engine.includes("createImageBitmap(file)"),"artwork inspection must decode image content");
 assert(!app.includes("\\nif("),"literal escaped newline broke app.js syntax");
 assert((app.match(/fallbackFiles.*addEventListener\("change"/g)||[]).length===1,"fallback handlers must be unique");
-assert(sw.includes("saad-ps2-v18"),"service worker cache must be bumped");
+assert(sw.includes("saad-ps2-v19"),"service worker cache must be bumped");
 assert(html.includes("توافق أنظمة Windows"),"Windows compatibility note missing");
 assert(app.includes('identity.platform==="ps1"?"psx-covers":"ps2-covers"')&&app.includes('"https://raw.githubusercontent.com/xlenore/"+repository+"/main/covers/default/"'),"platform-specific cover source selection missing");
 assert(app.includes("function valid(id){const value=String(id||\"\").toUpperCase();return /^[A-Z]{4}_\\d{3}\\.\\d{2}$/.test(value.replace(\"-\",\"_\"))||isPs1Id(value);}"),"PS1 serial validation missing");
@@ -140,7 +140,7 @@ assert(catalog.counts.PS1>=100&&catalog.counts.PS2>=100,"central catalog must co
 assert(catalog.games.every(g=>["PS1","PS2"].includes(g.platform)&&/^[A-Z]{4}-\d{5}$/.test(g.serial)&&typeof g.title==="string"&&g.title.length>0),"catalog records must have valid platform, serial and title");
 assert(new Set(catalog.games.map(g=>g.platform+":"+g.serial)).size===catalog.games.length,"catalog serials must be unique per platform");
 assert(app.includes('split("\\0")'),"UL config must split null-terminated fields");
-assert(sw.includes("saad-ps2-v18"),"service worker cache must be bumped after artwork export changes");
+assert(sw.includes("saad-ps2-v19"),"service worker cache must be bumped after artwork export changes");
 assert(app.includes("scanGameTree"),"recursive game scanner missing");
 assert(app.includes("extractDiscId"),"disc serial extractor missing");
 assert(app.includes("await download(true)"),"automatic missing-art download missing");
@@ -156,4 +156,14 @@ assert(desktopPackage.devDependencies["electron-builder"]==="26.18.1","electron-
 assert(desktopPackage.overrides.tar==="7.5.22","tar security override missing");
 assert(desktopPackage.overrides.minimatch==="11.0.4","minimatch security override missing");
 assert(desktopPackage.scripts.smoke&&desktopPackage.scripts.test,"desktop smoke/test commands missing");
+// Regression coverage for PS1 disc IDs stored in dotted/underscore form.
+assert.equal(catalogUtils.normalizeSerial("SCUS_949.00"),"SCUS-94900");
+assert.equal(catalogUtils.normalizeSerial("SCUS-94900"),"SCUS-94900");
+assert.equal(db.classifyPlatform("SCUS-94900","BIN"),"PS1");
+assert.equal(db.classifyPlatform("SLUS_203.12","ISO"),"PS2");
+assert(app.includes("function resolvePlatform(id,format)"),"catalog-first platform resolver missing");
+assert(app.includes("findCatalogRecord(rawId)"),"catalog lookup must use raw disc ID");
+assert(app.includes("artworkIdentity(effectiveId(game),game.platform"),"artwork identity must use resolved platform");
+assert(app.includes("fetchArt(id,g.platform||g.catalog?.platform)"),"artwork download must receive resolved platform");
+assert(app.includes("matches.length===1"),"ambiguous catalog matches must not be silently selected");
 console.log("PASS: JS syntax, populated catalog, PS1/PS2 serial matching, diagnostics, dependency hardening and release workflow.");
