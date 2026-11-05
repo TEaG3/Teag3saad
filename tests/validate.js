@@ -211,7 +211,7 @@ assert(desktopPackage.devDependencies["electron-builder"]==="26.18.1","electron-
 assert(desktopMain.includes("protocol.registerFileProtocol")&&!desktopMain.includes("protocol.handle("),"legacy Electron file protocol API missing");
 assert(desktopMain.includes("fetchArtworkResponse")&&!desktopMain.includes("net.fetch("),"legacy Electron HTTPS downloader missing");
 assert(app.includes("تعذر حفظ الصور على الفلاش. أعد توصيله وتحقق من سلامته ثم حاول مجدداً."),"USB failure notification should be short and clear");
-assert(!downloadPage.includes("Windows 10 أو Windows 11"),"download page should not list supported Windows versions");
+assert(!/Windows 7|Windows 8|Windows 10|Windows 11|متطلبات التشغيل/.test(downloadPage),"download page should not list supported operating systems");
 assert(desktopMain.includes("protocol.registerFileProtocol")&&!desktopMain.includes("protocol.handle("),"legacy Electron file protocol API missing");
 assert(desktopMain.includes("fetchArtworkResponse")&&!desktopMain.includes("net.fetch("),"legacy Electron HTTPS downloader missing");
 assert(app.includes("تعذر حفظ الصور على الفلاش. أعد توصيله وتحقق من سلامته ثم حاول مجدداً."),"USB failure notification should be short and clear");
