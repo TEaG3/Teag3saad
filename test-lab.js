@@ -33,12 +33,9 @@
  }
  async function testDatabase(){
   if(!("indexedDB" in window))throw new Error("IndexedDB غير مدعوم في هذا المتصفح.");
-  const db=await new Promise((resolve,reject)=>{
-   const req=indexedDB.open("saad-ps2-db");
-   req.onsuccess=()=>resolve(req.result);
-   req.onerror=()=>reject(req.error||new Error("تعذر فتح IndexedDB."));
-   req.onblocked=()=>reject(new Error("قاعدة البيانات محجوبة بواسطة نسخة أخرى من الموقع."));
-  });
+  const bridge=window.SaadPS2TestBridge;
+  if(!bridge?.ensureDb)throw new Error("لم يتم ربط منشئ قاعدة البيانات بمختبر الاختبار.");
+  const db=await bridge.ensureDb();
   const stores=Array.from(db.objectStoreNames);db.close();
   if(!stores.includes("games")||!stores.includes("library")||!stores.includes("catalog"))throw new Error("مخازن قاعدة البيانات غير مكتملة: "+stores.join(", "));
   return "تم فتح قاعدة saad-ps2-db فعلياً. المخازن: "+stores.join("، ");
