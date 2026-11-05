@@ -418,7 +418,7 @@ function csv(){
  const url=URL.createObjectURL(new Blob([data],{type:"text/csv;charset=utf-8"})),a=document.createElement("a");
  a.href=url;a.download="saad-ps2-library.csv";a.click();URL.revokeObjectURL(url);
 }
-function view(name){document.querySelectorAll(".view").forEach(x=>x.classList.remove("active"));$(name).classList.add("active");document.querySelectorAll(".nav").forEach(x=>x.classList.toggle("active",x.dataset.view===name));$("viewTitle").textContent=({library:"مكتبة الألعاب",artwork:"إدارة الأغلفة",storage:"تحليل التخزين",reports:"التقارير والسجل"})[name];$("sidebar").classList.remove("open");}
+function view(name){document.querySelectorAll(".view").forEach(x=>x.classList.remove("active"));$(name).classList.add("active");document.querySelectorAll(".nav").forEach(x=>x.classList.toggle("active",x.dataset.view===name));$("viewTitle").textContent=({library:"مكتبة الألعاب",artwork:"إدارة الأغلفة",storage:"تحليل التخزين",reports:"التقارير والسجل",testlab:"مختبر الاختبار الحقيقي"})[name];$("sidebar").classList.remove("open");}
 document.querySelectorAll(".nav").forEach(b=>b.addEventListener("click",()=>view(b.dataset.view)));
 document.querySelectorAll(".filter").forEach(b=>b.addEventListener("click",()=>{S.filter=b.dataset.filter;document.querySelectorAll(".filter").forEach(x=>x.classList.toggle("active",x===b));render();}));
 $("scan").onclick=scan;$("rescan").onclick=scan;$("csv").onclick=csv;if($("downloadToApp"))$("downloadToApp").onclick=downloadArtworkToApp;$("missing").onclick=()=>download(true);$("all").onclick=()=>download(false);$("search").oninput=e=>{S.query=e.target.value.toLowerCase();render();};$("menu").onclick=()=>$("sidebar").classList.toggle("open");
@@ -610,6 +610,7 @@ async function testUsbDrive(){
  out.textContent=lines.join("\n");
  log("اختبار USB: "+(passed?"نجح":"فشل")+"؛ تنظيف الملف المؤقت: "+(cleanup?"نجح":"تعذر")+".");
  msg(passed?"نجح اختبار الكتابة والقراءة للفلاش.":"فشل اختبار الفلاش أو لم تكتمل الكتابة والقراءة.",!passed||!cleanup);
+ return {passed,cleanup,error:errorMessage,bytes,elapsedSeconds:Number(elapsed),mismatch};
 }
 if($("runDiagnostics"))$("runDiagnostics").onclick=runDiagnostics;
 if($("runUsbTest"))$("runUsbTest").onclick=testUsbDrive;
@@ -618,4 +619,5 @@ if($("fallbackFilesPick"))$("fallbackFilesPick").onclick=()=>$("fallbackSingleFi
 if($("fallbackFiles"))$("fallbackFiles").addEventListener("change",e=>{if(e.target.files?.length)scanSelectedFiles(e.target.files);e.target.value="";});
 if($("fallbackSingleFiles"))$("fallbackSingleFiles").addEventListener("change",e=>{if(e.target.files?.length)scanSelectedFiles(e.target.files);e.target.value="";});
 
+window.SaadPS2TestBridge={getState:()=>({root:S.root,games:S.games,catalog:S.catalog,catalogStatus:S.catalogStatus}),runUsbTest:testUsbDrive,runDiagnostics,fetchArt,effectiveId};
 renderStorageCapabilities();
