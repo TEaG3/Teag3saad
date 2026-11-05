@@ -58,7 +58,7 @@
   const secure=!!window.isSecureContext;
   const ua=navigator.userAgent||"";
   const ios=/iPad|iPhone|iPod/.test(ua)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
-  return {picker,write:picker&&secure,secure,ios,mode:picker&&secure?"direct":"limited",message:!secure?"يلزم HTTPS أو localhost للوصول المباشر إلى المجلدات.":picker?"يمكن قراءة وكتابة أي وحدة تخزين يتعرف عليها نظام التشغيل ويعرضها كقرص/مجلد. نوع نظام الملفات نفسه لا يديره المتصفح.":ios?"Safari على iPad/iPhone لا يوفر هنا وصولاً عاماً للقراءة والكتابة إلى USB.":"هذا المتصفح لا يوفر واجهة اختيار مجلد مع صلاحية الكتابة؛ يلزم متصفح متوافق أو تطبيق أصلي."};
+  return {picker,write:picker&&secure,secure,ios,mode:picker&&secure?"direct":"limited",message:!secure?"يلزم HTTPS أو localhost للوصول المباشر إلى المجلدات.":picker?"يمكن للموقع القراءة والكتابة على وحدة مركّبة يتعرف عليها نظام التشغيل بعد منح الإذن؛ المتصفح لا يهيئ نظام الملفات ولا يقرأ القرص الخام.":ios?"Safari على iPad/iPhone لا يوفر هنا وصولاً عاماً مضموناً للقراءة والكتابة إلى USB.":"هذا المتصفح لا يوفر واجهة اختيار مجلد مع صلاحية الكتابة؛ يلزم متصفح متوافق أو تطبيق أصلي.",oplUsbFilesystems:"FAT32؛ وexFAT ابتداءً من OPL v1.2.0 beta (حسب النسخة). NTFS/APFS/ext ليست ضمن أنظمة ملفات USB المذكورة في دعم OPL."};
  }
  window.PS2Database={normalizeId,regionFromId,inspectLibrary,inspectArt,storageCapabilities};
 })();
