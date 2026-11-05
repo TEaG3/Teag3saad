@@ -97,6 +97,8 @@ jobs:
           node-version: 24
           package-manager-cache: false
       - name: Update central PS1/PS2 game catalog
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/update-game-catalog.cjs
       - name: Generate or refresh npm lockfile
         id: lockfile
