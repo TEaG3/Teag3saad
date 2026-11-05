@@ -24,7 +24,7 @@
    const src=String(g.source||"").toLowerCase();
    if(src){if(!bySource.has(src))bySource.set(src,[]);bySource.get(src).push(g);}
    if(!id)issues.push({type:"missing-id",title:g.title||g.source||"لعبة غير معرّفة",message:"لا يوجد Game ID صالح؛ يلزم التحقق يدوياً."});
-   if(!["ISO","ZSO","UL"].includes(g.format))issues.push({type:"format",title:g.title||"ملف",message:"صيغة غير معروفة في سجل المكتبة."});
+   if(!["ISO","ZSO","UL","VCD","BIN","CUE","IMG","CHD","PBP"].includes(String(g.format||"").toUpperCase()))issues.push({type:"format",title:g.title||"ملف",message:"صيغة غير معروفة في سجل المكتبة."});
    if(g.format!=="UL"&&(!Number.isFinite(Number(g.size))||Number(g.size)<=0))issues.push({type:"size",title:g.title||"ملف",message:"حجم الملف غير صالح أو صفر."});
    if(g.format==="UL"&&!g.ulPartsComplete)issues.push({type:"ul-incomplete",title:g.title||"UL",message:"أجزاء USBExtreme غير مكتملة أو لا يمكن التحقق منها."});
   }
@@ -58,7 +58,7 @@
   const secure=!!window.isSecureContext;
   const ua=navigator.userAgent||"";
   const ios=/iPad|iPhone|iPod/.test(ua)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
-  return {picker,write:picker&&secure,secure,ios,mode:picker&&secure?"direct":"limited",message:!secure?"يلزم HTTPS أو localhost للوصول المباشر إلى المجلدات.":picker?"يمكن للموقع القراءة والكتابة على وحدة مركّبة يتعرف عليها نظام التشغيل بعد منح الإذن؛ المتصفح لا يهيئ نظام الملفات ولا يقرأ القرص الخام.":ios?"Safari على iPad/iPhone لا يوفر هنا وصولاً عاماً مضموناً للقراءة والكتابة إلى USB.":"هذا المتصفح لا يوفر واجهة اختيار مجلد مع صلاحية الكتابة؛ يلزم متصفح متوافق أو تطبيق أصلي.",oplUsbFilesystems:"FAT32؛ وexFAT ابتداءً من OPL v1.2.0 beta (حسب النسخة). NTFS/APFS/ext ليست ضمن أنظمة ملفات USB المذكورة في دعم OPL."};
+  return {picker,write:picker&&secure,secure,ios,mode:picker&&secure?"direct":"limited",message:!secure?"يلزم HTTPS أو localhost للوصول المباشر إلى المجلدات.":picker?"يمكن للموقع القراءة والكتابة على وحدة مركّبة يتعرف عليها نظام التشغيل بعد منح الإذن؛ المتصفح لا يهيئ نظام الملفات ولا يقرأ القرص الخام.":ios?"Safari على iPad/iPhone لا يوفر هنا وصولاً عاماً مضموناً للقراءة والكتابة إلى USB.":"هذا المتصفح لا يوفر واجهة اختيار مجلد مع صلاحية الكتابة؛ يلزم متصفح متوافق أو تطبيق أصلي.",oplUsbFilesystems:"يعتمد التعرف على FAT/FAT32/exFAT على نظام التشغيل والمتصفح؛ توافق تشغيل USB داخل OPL مستقل ويتوقف على إصدار OPL وإعداداته. لا يمكن للموقع ضمان تشغيل كل نظام ملفات."};
  }
  window.PS2Database={normalizeId,regionFromId,inspectLibrary,inspectArt,storageCapabilities};
 })();
