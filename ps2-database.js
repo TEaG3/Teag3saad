@@ -19,8 +19,9 @@
   const id=String(serial||"").trim().toUpperCase();
   if(/^[A-Z]{4}-\d{5}$/.test(id.replace(/_/g,"-")))return "PS1";
   if(/^[A-Z]{4}_\d{3}\.\d{2}$/.test(id.replace(/-/g,"_")))return "PS2";
-  const ext=String(format||"").toUpperCase();
-  return ["ISO","ZSO","UL"].includes(ext)?"PS2":"UNKNOWN";
+  // File extensions identify a container format, not the console generation.
+  // Without a validated serial or catalog match, keep the platform unknown.
+  return "UNKNOWN";
  }
  function inspectLibrary(games){
   const list=Array.isArray(games)?games:[];
