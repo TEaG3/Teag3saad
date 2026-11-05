@@ -156,4 +156,14 @@ assert(desktopPackage.devDependencies["electron-builder"]==="26.18.1","electron-
 assert(desktopPackage.overrides.tar==="7.5.22","tar security override missing");
 assert(desktopPackage.overrides.minimatch==="11.0.4","minimatch security override missing");
 assert(desktopPackage.scripts.smoke&&desktopPackage.scripts.test,"desktop smoke/test commands missing");
+// Regression coverage for PS1 disc IDs stored in dotted/underscore form.
+assert.equal(catalogUtils.normalizeSerial("SCUS_949.00"),"SCUS-94900");
+assert.equal(catalogUtils.normalizeSerial("SCUS-94900"),"SCUS-94900");
+assert.equal(db.classifyPlatform("SCUS-94900","BIN"),"PS1");
+assert.equal(db.classifyPlatform("SLUS_203.12","ISO"),"PS2");
+assert(app.includes("function resolvePlatform(id,format)"),"catalog-first platform resolver missing");
+assert(app.includes("findCatalogRecord(rawId)"),"catalog lookup must use raw disc ID");
+assert(app.includes("artworkIdentity(effectiveId(g),game.platform"),"artwork identity must use resolved platform");
+assert(app.includes("fetchArt(id,g.platform||g.catalog?.platform)"),"artwork download must receive resolved platform");
+assert(app.includes("matches.length===1"),"ambiguous catalog matches must not be silently selected");
 console.log("PASS: JS syntax, populated catalog, PS1/PS2 serial matching, diagnostics, dependency hardening and release workflow.");
