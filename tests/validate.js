@@ -72,7 +72,7 @@ assert(desktopWorkflow.includes("npm run smoke")&&desktopMain.includes("--smoke-
 assert(desktopWorkflow.includes("WINDOWS_CERTIFICATE_BASE64")&&desktopWorkflow.includes("Get-AuthenticodeSignature"),"optional Authenticode signing and verification missing");
 assert(!downloadPage.includes("Portable"),"download page must not mention Portable edition");
 assert(downloadPage.includes("Saad-PS2-Setup-1.1.3.exe"),"download page must link Windows Setup installer");
-assert(downloadPage.includes("SmartScreen")&&downloadPage.includes("متطلبات التشغيل"),"download page must explain Windows security and requirements");
+assert(!/SmartScreen|متطلبات التشغيل|Windows 7|Windows 8|Windows 10|Windows 11/.test(downloadPage),"download page should avoid technical setup and compatibility clutter");
 assert(desktopWorkflow.includes("softprops/action-gh-release@v3.0.3")&&desktopWorkflow.includes("tag_name: desktop-latest")&&desktopWorkflow.includes("make_latest: true")&&desktopWorkflow.includes("Saad-PS2-Setup-1.1.3.exe"),"successful Windows Setup builds must publish the versioned installer");
 const ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(x=>x[1]);
 assert.equal(new Set(ids).size,ids.length,"duplicate HTML IDs");
