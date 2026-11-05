@@ -196,7 +196,7 @@ function render(){
  $('total').textContent=S.games.length;$('iso').textContent=iso+zso;$('ul').textContent=ul;$('covers').textContent=cov;if($('ps1Count'))$('ps1Count').textContent=S.games.filter(g=>g.platform==='PS1').length;
  $('allCount').textContent=S.games.length;$('missingCount').textContent=miss;
  $('sGames').textContent=S.games.length;$('sIso').textContent=iso+zso;$('sUl').textContent=ul;$('sSize').textContent=fmt(S.games.reduce((a,g)=>a+g.size,0));
- $('csv').disabled=!S.games.length;$('rescan').disabled=!S.root;$('missing').disabled=!S.games.length;$('all').disabled=!S.games.length;if($('downloadToApp'))$('downloadToApp').disabled=!S.games.length;
+ $('csv').disabled=!S.games.length;$('rescan').disabled=!S.root;$('missing').disabled=!S.games.length;$('all').disabled=!S.games.length;if($('downloadToApp'))$('downloadToApp').disabled=!S.games.length||!S.root;
  const rows=S.games.filter(g=>(!S.query||(((g.meta?.title||g.title)+' '+(effectiveId(g)||g.gameId)).toLowerCase().includes(S.query)))&&(S.filter==='all'||(S.filter==='missing'&&(!effectiveId(g)||!g.hasCover||!g.hasIcon))||S.filter===g.format));
  $('games').innerHTML=rows.length?rows.map(g=>{
   const id=effectiveId(g),displayId=id||g.gameId,cover=g.artworkDataUrl||(id?coverUrls(id)[0]:'');
@@ -244,30 +244,10 @@ async function restoreCachedArtwork(){
  }
 }
 async function downloadArtworkToApp(){
- if(!window.saadDesktop?.downloadArtwork){msg("تنزيل الأغلفة إلى ذاكرة البرنامج متاح في تطبيق Windows فقط.",true);return;}
- const list=S.games.filter(game=>artworkIdentity(effectiveId(game)));
- if(!list.length){msg("لم يتم العثور على ألعاب ذات Game ID صالح. افحص الألعاب أولاً.",true);return;}
- $("progress").hidden=false;
- let success=0,failed=0,alreadyCached=0;
- for(let index=0;index<list.length;index++){
-  const game=list[index],identity=artworkIdentity(effectiveId(game));
-  $("progressText").textContent="تنزيل الغلاف إلى البرنامج: "+game.title;
-  $("progressCount").textContent=(index+1)+" / "+list.length;
-  $("progressBar").style.width=((index+1)/list.length*100)+"%";
-  $("progressDetail").textContent=identity.platform.toUpperCase()+" · "+identity.serial;
-  try{
-   let result=await window.saadDesktop.getArtwork(identity);
-   if(result?.ok)alreadyCached++;
-   else result=await window.saadDesktop.downloadArtwork(identity);
-   if(!result?.ok||!result.dataUrl)throw new Error(result?.error||"لم يُعثر على غلاف لهذا الرقم.");
-   game.artworkDataUrl=result.dataUrl;game.hasLocalCover=true;success++;
-  }catch(error){failed++;log("تعذر غلاف "+identity.serial+": "+error.message);}
- }
- render();
- $("progressText").textContent="اكتمل تنزيل أغلفة البرنامج";
- $("progressDetail").textContent="جاهزة: "+success+" · فشلت: "+failed+" · من الذاكرة السابقة: "+alreadyCached;
- log("أغلفة ذاكرة البرنامج: جاهزة "+success+"، فشل "+failed+"، مخزنة مسبقاً "+alreadyCached+".");
- msg("صور البرنامج: "+success+" جاهزة، "+failed+" غير متاحة.");
+ if(!S.root){msg("اختر وحدة USB أولاً؛ سيتم الحفظ داخل ART ليقرأها OPL.",true);return;}
+ // The native Windows downloader caches the original online cover.
+ // download(false) then creates and verifies OPL _COV/_ICO files on USB:/ART.
+ await download(false);
 }
 async function ensureWritePermission(){
  if(!S.root)throw new Error("لم يتم اختيار وحدة التخزين.");
