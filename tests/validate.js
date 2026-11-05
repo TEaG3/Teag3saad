@@ -23,7 +23,7 @@ new Function(app);
 new Function(sw);
 new Function(engine);
 assert(app.includes("function artworkIdentity(id,platformHint)"),"artwork serial normalization missing");
-assert(app.includes('serial:match[1]+"-"+match[2]+match[3]'),"PS2 serial dot-to-five-digit conversion missing");
+assert(app.includes('return dotted[1]+"-"+dotted[2]+dotted[3]'),"PS2 serial dot-to-five-digit conversion missing");
 assert(app.includes("window.saadDesktop?.downloadArtwork"),"Windows native artwork downloader is not connected");
 assert(app.includes("async function downloadArtworkToApp()"),"in-app artwork cache download flow missing");
 assert(app.includes("async function restoreCachedArtwork()"),"cached artwork restore on scan missing");
