@@ -114,7 +114,7 @@ assert(engine.includes("valid:[]"),"artwork inspection must return verified file
 assert(engine.includes("createImageBitmap(file)"),"artwork inspection must decode image content");
 assert(!app.includes("\\nif("),"literal escaped newline broke app.js syntax");
 assert((app.match(/fallbackFiles.*addEventListener\("change"/g)||[]).length===1,"fallback handlers must be unique");
-assert(sw.includes("saad-ps2-v19"),"service worker cache must be bumped");
+assert(sw.includes("saad-ps2-v20"),"service worker cache must be bumped");
 assert(html.includes("توافق أنظمة Windows"),"Windows compatibility note missing");
 assert(app.includes('identity.platform==="ps1"?"psx-covers":"ps2-covers"')&&app.includes('"https://raw.githubusercontent.com/xlenore/"+repository+"/main/covers/default/"'),"platform-specific cover source selection missing");
 assert(app.includes("function valid(id){const value=String(id||\"\").toUpperCase();return /^[A-Z]{4}_\\d{3}\\.\\d{2}$/.test(value.replace(\"-\",\"_\"))||isPs1Id(value);}"),"PS1 serial validation missing");
@@ -140,16 +140,35 @@ assert(catalog.counts.PS1>=100&&catalog.counts.PS2>=100,"central catalog must co
 assert(catalog.games.every(g=>["PS1","PS2"].includes(g.platform)&&/^[A-Z]{4}-\d{5}$/.test(g.serial)&&typeof g.title==="string"&&g.title.length>0),"catalog records must have valid platform, serial and title");
 assert(new Set(catalog.games.map(g=>g.platform+":"+g.serial)).size===catalog.games.length,"catalog serials must be unique per platform");
 assert(app.includes('split("\\0")'),"UL config must split null-terminated fields");
-assert(sw.includes("saad-ps2-v19"),"service worker cache must be bumped after artwork export changes");
+assert(sw.includes("saad-ps2-v20"),"service worker cache must be bumped after artwork export changes");
 assert(app.includes("scanGameTree"),"recursive game scanner missing");
 assert(app.includes("extractDiscId"),"disc serial extractor missing");
 assert(app.includes("await download(true)"),"automatic missing-art download missing");
 assert(html.includes('id="ps1Count"'),"PS1 count display missing");
 
-assert(app.includes("resolvePlatform(id,ext)"),"both scanners must use the catalog-first platform resolver");
-assert(app.includes("function resolvePlatform(id,format)"),"catalog-first platform resolver missing");
+assert.equal((app.match(/resolvePlatform\(id,ext,title\)/g)||[]).length,2,"both scanners must use title-aware catalog platform resolution");
+assert(app.includes("function resolvePlatform(id,format,title)"),"title-aware catalog-first platform resolver missing");
+assert(app.includes("function normalizeCatalogTitle(value)"),"catalog title normalization for duplicate serials missing");
 assert(app.includes("function catalogSerial(value)"),"catalog matching must normalize dotted PS2 serials");
 assert(app.includes("function catalogOplId(record)"),"PS2 source serials must convert to OPL Game IDs");
+const resolverStart=app.indexOf("function catalogSerial(value){");
+const resolverEnd=app.indexOf("async function syncCentralCatalog(){",resolverStart);
+assert(resolverStart>=0&&resolverEnd>resolverStart,"catalog resolver functions must be present and contiguous");
+const resolverSandbox={
+ S:{catalog:[
+  {platform:"PS1",serial:"SCUS-94900",title:"Crash Bandicoot"},
+  {platform:"PS2",serial:"SCUS-94900",title:"Unrelated duplicate serial"},
+  {platform:"PS1",serial:"SLUS-00402",title:"Tekken 3"},
+  {platform:"PS2",serial:"SLPS-20015",title:"Tekken Tag Tournament"}
+ ]},
+ window:{PS2Database:{classifyPlatform:()=> "UNKNOWN"}}
+};
+vm.runInNewContext(app.slice(resolverStart,resolverEnd)+"\nthis.resolvePlatform=resolvePlatform;",resolverSandbox);
+assert.equal(resolverSandbox.resolvePlatform("SCUS_949.00","CUE","Crash Bandicoot (USA)"),"PS1","duplicate dotted PS1 serial must resolve from matching game title");
+assert.equal(resolverSandbox.resolvePlatform("SLUS_004.02","BIN","Tekken 3 (USA) (Track 1)"),"PS1","track suffixes and region tags must not block PS1 title matching");
+assert.equal(resolverSandbox.resolvePlatform("SCUS_949.00","CUE"),"UNKNOWN","ambiguous serial without title evidence must remain unknown");
+assert.equal(resolverSandbox.resolvePlatform("SLPS_200.15","ISO","Tekken Tag Tournament"),"PS2","unique PS2 catalog serial must remain PS2");
+
 assert(desktopPackage.version==="1.1.1","desktop release version mismatch");
 assert(desktopPackage.devDependencies.electron==="45.2.3","Electron runtime version mismatch");
 assert(desktopPackage.devDependencies["electron-builder"]==="26.18.1","electron-builder version mismatch");
