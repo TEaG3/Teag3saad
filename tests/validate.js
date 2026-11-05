@@ -48,7 +48,7 @@ assert(app.includes("normalizePs1Id"),"PS1 serial normalization missing");
 assert(html.includes("SLUS-00896"),"PS1 serial format hint missing");
 
 assert(app.includes("webkitRelativePath"),"selected-file path normalization must handle Windows separators");
-assert(app.includes('return /\\\\.(iso|zso)$/i.test(f.name);')||app.includes('return /\\.(iso|zso)$/i.test(f.name);'),"selected ISO/ZSO extension matcher missing");
+assert(app.includes("iso|zso|bin|cue"),"PS1/PS2 extension matcher missing");
 assert(app.includes('split("\\0")'),"UL config must split null-terminated fields");
 assert(sw.includes("saad-ps2-v9"),"service worker cache must be bumped after PS1/PS2 scanning changes");
 assert(app.includes("scanGameTree"),"recursive game scanner missing");
