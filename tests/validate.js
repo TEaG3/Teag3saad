@@ -94,7 +94,7 @@ assert(!app.includes("\\nif("),"literal escaped newline broke app.js syntax");
 assert((app.match(/fallbackFiles.*addEventListener\("change"/g)||[]).length===1,"fallback handlers must be unique");
 assert(sw.includes("saad-ps2-v15"),"service worker cache must be bumped");
 assert(html.includes("توافق أنظمة Windows"),"Windows compatibility note missing");
-assert(app.includes("xlenore/psx-covers/main/covers/default/"),"PS1 cover source missing");
+assert(app.includes('identity.platform==="ps1"?"psx-covers":"ps2-covers"')&&app.includes('"https://raw.githubusercontent.com/xlenore/"+repository+"/main/covers/default/"'),"platform-specific cover source selection missing");
 assert(app.includes("function valid(id){const value=String(id||\"\").toUpperCase();return /^[A-Z]{4}_\\d{3}\\.\\d{2}$/.test(value.replace(\"-\",\"_\"))||isPs1Id(value);}"),"PS1 serial validation missing");
 assert(app.includes("normalizePs1Id"),"PS1 serial normalization missing");
 assert(html.includes("SLUS-00896"),"PS1 serial format hint missing");
