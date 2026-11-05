@@ -40,7 +40,7 @@ assert.equal(report.incompleteUl,1);
 assert(css.includes("#diagnosticResults"),"diagnostics styles missing");
 assert(!app.includes("\\nif("),"literal escaped newline broke app.js syntax");
 assert((app.match(/fallbackFiles.*addEventListener\("change"/g)||[]).length===1,"fallback handlers must be unique");
-assert(sw.includes("saad-ps2-v6"),"service worker cache must be bumped");
+assert(sw.includes("saad-ps2-v9"),"service worker cache must be bumped");
 assert(html.includes("توافق أنظمة Windows"),"Windows compatibility note missing");
 assert(app.includes("xlenore/psx-covers/main/covers/default/"),"PS1 cover source missing");
 assert(app.includes("function valid(id){const value=String(id||\"\").toUpperCase();return /^[A-Z]{4}_\\d{3}\\.\\d{2}$/.test(value.replace(\"-\",\"_\"))||isPs1Id(value);}"),"PS1 serial validation missing");
@@ -54,6 +54,6 @@ assert(sw.includes("saad-ps2-v9"),"service worker cache must be bumped after PS1
 assert(app.includes("scanGameTree"),"recursive game scanner missing");
 assert(app.includes("extractDiscId"),"disc serial extractor missing");
 assert(app.includes("await download(true)"),"automatic missing-art download missing");
-assert(html.includes("id=\\"ps1Count\\""),"PS1 count display missing");
+assert(html.includes('id="ps1Count"'),"PS1 count display missing");
 
 console.log("PASS: JS syntax, manifest, static DOM references, database ID/region checks, duplicate and UL diagnostics.");
