@@ -48,7 +48,9 @@ assert.equal(db.normalizeId("NOT_A_GAME"),null);
 assert.equal(db.classifyPlatform("SLUS-00896","BIN"),"PS1");
 assert.equal(db.classifyPlatform("SLUS_203.12","BIN"),"PS2");
 assert.equal(db.classifyPlatform(null,"CHD"),"UNKNOWN");
-assert.equal(db.classifyPlatform(null,"ISO"),"PS2");
+assert.equal(db.classifyPlatform(null,"ISO"),"UNKNOWN");
+assert.equal(db.classifyPlatform(null,"ZSO"),"UNKNOWN");
+assert.equal(db.classifyPlatform(null,"UL"),"UNKNOWN");
 assert.equal(db.regionFromId("SLES_123.45").code,"PAL");
 assert.equal(db.regionFromId("SLUS_203.12").code,"NTSC-U");
 const report=db.inspectLibrary([
@@ -65,7 +67,7 @@ assert.equal(formatReport.issues.filter(x=>x.type==="format").length,0,"all supp
 assert(css.includes("#diagnosticResults"),"diagnostics styles missing");
 assert(!app.includes("\\nif("),"literal escaped newline broke app.js syntax");
 assert((app.match(/fallbackFiles.*addEventListener\("change"/g)||[]).length===1,"fallback handlers must be unique");
-assert(sw.includes("saad-ps2-v11"),"service worker cache must be bumped");
+assert(sw.includes("saad-ps2-v12"),"service worker cache must be bumped");
 assert(html.includes("توافق أنظمة Windows"),"Windows compatibility note missing");
 assert(app.includes("xlenore/psx-covers/main/covers/default/"),"PS1 cover source missing");
 assert(app.includes("function valid(id){const value=String(id||\"\").toUpperCase();return /^[A-Z]{4}_\\d{3}\\.\\d{2}$/.test(value.replace(\"-\",\"_\"))||isPs1Id(value);}"),"PS1 serial validation missing");
@@ -85,7 +87,7 @@ const catalog=JSON.parse(fs.readFileSync("data/game-catalog.json","utf8"));
 assert.equal(catalog.schemaVersion,1);
 assert.deepEqual(catalog.supportedFormats,["ISO","ZSO","UL","VCD","BIN","CUE","IMG","CHD","PBP"]);
 assert(app.includes('split("\\0")'),"UL config must split null-terminated fields");
-assert(sw.includes("saad-ps2-v11"),"service worker cache must be bumped after PS1/PS2 scanning changes");
+assert(sw.includes("saad-ps2-v12"),"service worker cache must be bumped after PS1/PS2 scanning changes");
 assert(app.includes("scanGameTree"),"recursive game scanner missing");
 assert(app.includes("extractDiscId"),"disc serial extractor missing");
 assert(app.includes("await download(true)"),"automatic missing-art download missing");
