@@ -1,13 +1,6 @@
 "use strict";
 (function(){
- const ID=/^[A-Z]{4}_\\d{3}\\.\\d{2}$/;
- const REGION={
-  NTSC_U:["SLUS","SCUS","SLPS","SCAJ"],
-  PAL:["SLES","SCES","SCED","SLED"],
-  NTSC_J:["SLPM","SCPS","SLPS","SLPS"],
-  NTSC_K:["SLKA"],
-  ASIA:["SLAJ","SCAJ"]
- };
+ const ID=/^[A-Z]{4}_\d{3}\.\d{2}$/;
  function normalizeId(value){
   const v=String(value||"").trim().toUpperCase().replace(/-/g,"_");
   return ID.test(v)?v:null;
@@ -50,7 +43,7 @@
    if(name.endsWith("_ICO.PNG"))report.icons++;
   }
   for(const [name,entry] of map){
-   if(!(/_(COV\\.(JPG|PNG)|ICO\\.PNG)$/i.test(name)))continue;
+   if(!(/_(COV\.(JPG|PNG)|ICO\.PNG)$/i.test(name)))continue;
    try{
     const bitmap=await createImageBitmap(await entry.getFile());
     const expected=name.includes("_COV.")?[140,200]:[64,64];
