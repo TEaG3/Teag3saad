@@ -153,6 +153,31 @@ assert(app.includes("cueText.matchAll"),"CUE FILE track references must be parse
 assert(app.includes('format:"CUE"'),"multi-track disc must be represented as one CUE game");
 assert(app.includes("const consumedBins=new Set()"),"CUE-referenced BIN tracks must be excluded from duplicate game entries");
 assert(app.includes("const cueFiles=gameFiles.filter"),"manual file selection must group CUE and BIN tracks");
+
+const cueStart=app.indexOf("async function buildCueGame(cueEntry,entries,pathOf){");
+const cueEnd=app.indexOf("async function scanGameTree(dir,prefix){",cueStart);
+assert(cueStart>=0&&cueEnd>cueStart,"CUE grouping helper must be isolated for regression tests");
+const cueSandbox={
+ localKey:(prefix,value)=>prefix+"_"+value,
+ extractDiscId:async file=>/Track 1/i.test(file.name)?"SLUS_004.02":null,
+ resolvePlatform:(id,format,title)=>id==="SLUS_004.02"&&format==="CUE"&&title==="Tekken 3 (USA)"?"PS1":"UNKNOWN"
+};
+vm.runInNewContext(app.slice(cueStart,cueEnd)+"\nthis.buildCueGame=buildCueGame;",cueSandbox);
+const cueMock={name:"Tekken 3 (USA).cue",size:12,slice:()=>({text:async()=>'FILE "Tekken 3 (USA) (Track 1).bin" BINARY\nFILE "Tekken 3 (USA) (Track 2).bin" BINARY\nFILE "Tekken 3 (USA) (Track 3).bin" BINARY'})};
+const trackMocks=[
+ {name:"Tekken 3 (USA) (Track 1).bin",size:100},
+ {name:"Tekken 3 (USA) (Track 2).bin",size:20},
+ {name:"Tekken 3 (USA) (Track 3).bin",size:30}
+];
+(async()=>{
+ const cueGame=await cueSandbox.buildCueGame(cueMock,[cueMock,...trackMocks],e=>e.name);
+ assert.equal(cueGame.title,"Tekken 3 (USA)");
+ assert.equal(cueGame.platform,"PS1");
+ assert.equal(cueGame.format,"CUE");
+ assert.equal(cueGame.size,162,"CUE game size must include all referenced BIN tracks");
+ assert.equal(cueGame.discFiles.length,4,"one CUE plus all referenced tracks must form one game");
+})().catch(error=>{console.error(error);process.exitCode=1;});
+
 assert(app.includes("function normalizeCatalogTitle(value)"),"catalog title normalization for duplicate serials missing");
 assert(app.includes("function catalogSerial(value)"),"catalog matching must normalize dotted PS2 serials");
 assert(app.includes("function catalogOplId(record)"),"PS2 source serials must convert to OPL Game IDs");
