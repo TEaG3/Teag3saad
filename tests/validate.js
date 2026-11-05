@@ -112,7 +112,7 @@ const catalog=JSON.parse(fs.readFileSync("data/game-catalog.json","utf8"));
 assert.equal(catalog.schemaVersion,1);
 assert.deepEqual(catalog.supportedFormats,["ISO","ZSO","UL","VCD","BIN","CUE","IMG","CHD","PBP"]);
 assert(app.includes('split("\\0")'),"UL config must split null-terminated fields");
-assert(sw.includes("saad-ps2-v13"),"service worker cache must be bumped after PS1/PS2 scanning changes");
+assert(sw.includes("saad-ps2-v15"),"service worker cache must be bumped after artwork export changes");
 assert(app.includes("scanGameTree"),"recursive game scanner missing");
 assert(app.includes("extractDiscId"),"disc serial extractor missing");
 assert(app.includes("await download(true)"),"automatic missing-art download missing");
