@@ -38,4 +38,8 @@ assert.equal(report.duplicateIds,1);
 assert.equal(report.missingId,1);
 assert.equal(report.incompleteUl,1);
 assert(css.includes("#diagnosticResults"),"diagnostics styles missing");
+assert(!app.includes("\\nif("),"literal escaped newline broke app.js syntax");
+assert((app.match(/fallbackFiles.*addEventListener\("change"/g)||[]).length===1,"fallback handlers must be unique");
+assert(sw.includes("saad-ps2-v6"),"service worker cache must be bumped");
+assert(html.includes("توافق أنظمة Windows"),"Windows compatibility note missing");
 console.log("PASS: JS syntax, manifest, static DOM references, database ID/region checks, duplicate and UL diagnostics.");
