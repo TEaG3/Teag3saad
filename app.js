@@ -625,19 +625,13 @@ async function testUsbDrive(){
  finally{
   if(name){try{await S.root.removeEntry(name);}catch(e){cleanup=false;}}
  }
- const elapsed=((performance.now()-started)/1000).toFixed(2);
- const lines=[
-  "نتيجة اختبار الكتابة والقراءة: "+(passed?"نجح":"فشل"),
-  "حجم الاختبار: 4 MiB ("+bytes.toLocaleString("en-US")+" بايت)",
-  "التحقق: "+(passed?"تمت مطابقة جميع البايتات بعد إغلاق الملف وإعادة فتحه":"لم تكتمل مطابقة البيانات"),
-  "حذف ملف الاختبار المؤقت: "+(cleanup?"تم":"تعذر الحذف؛ احذف الملف "+name+" يدوياً"),
-  "المدة: "+elapsed+" ثانية"
- ];
- if(errorMessage)lines.push("السبب: "+errorMessage);
- lines.push("حدود الاختبار: هذا يثبت أن مسار الكتابة والقراءة الحالي يعمل لهذا الحجم فقط؛ ولا يقيس صحة شرائح NAND أو كامل سعة الفلاش ولا يغني عن فحص قطاعات شامل.");
- out.textContent=lines.join("\n");
- log("اختبار USB: "+(passed?"نجح":"فشل")+"؛ تنظيف الملف المؤقت: "+(cleanup?"نجح":"تعذر")+".");
- msg(passed?"نجح اختبار الكتابة والقراءة للفلاش.":"فشل اختبار الفلاش أو لم تكتمل الكتابة والقراءة.",!passed||!cleanup);
+ out.textContent=passed&&cleanup
+  ?"الفلاش يعمل ويمكن حفظ الملفات عليه."
+  :!cleanup
+   ?"تعذر تنظيف ملف الاختبار. أعد توصيل الفلاش وتحقق من محتوياته."
+   :"تعذر اختبار الفلاش. أعد توصيله وتحقق من سلامته ثم حاول مجدداً.";
+ log("اختبار الفلاش: "+(passed&&cleanup?"نجح":"تعذر"));
+ msg(passed&&cleanup?"الفلاش يعمل بشكل سليم.":"تعذر اختبار الفلاش. أعد توصيله وتحقق من سلامته.",!passed||!cleanup);
 }
 if($("runDiagnostics"))$("runDiagnostics").onclick=runDiagnostics;
 if($("runUsbTest"))$("runUsbTest").onclick=testUsbDrive;
