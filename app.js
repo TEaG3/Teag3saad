@@ -136,12 +136,12 @@ async function scanSelectedFiles(fileList){
  $("driveName").textContent="جارٍ فحص الملفات المختارة";
  $("driveInfo").textContent="قراءة الملفات وتحليلها...";
  $("games").innerHTML='<tr><td colspan="9" class="empty">جارٍ تحليل الملفات...</td></tr>';
- const gameFiles=files.filter(function(f){return /\.(iso|zso)$/i.test(f.name);});
+  const gameFiles=files.filter(function(f){return /\.(iso|zso|bin|cue|img|chd|pbp)$/i.test(f.name);});
  for(let i=0;i<gameFiles.length;i++){
   const f=gameFiles[i];
   try{
-   const path=pathOf(f),parts=path.split("/"),isIso=/\.iso$/i.test(f.name),id=isIso?await gameId(f):idFromName(f.name);
-   S.games.push({title:f.name.replace(/\.(iso|zso)$/i,""),recordKey:localKey("LIB",path.toLowerCase()),gameId:id||localKey("FILE",path.toLowerCase()),oplGameId:id||null,format:isIso?"ISO":"ZSO",size:f.size,hasCover:false,hasIcon:false,source:path,folder:parts.length>1?parts[parts.length-2]:"ROOT"});
+    const path=pathOf(f),parts=path.split("/"),id=await extractDiscId(f),ext=f.name.split(".").pop().toUpperCase(),platform=((id&&isPs1Id(id))||["BIN","CUE","IMG","CHD","PBP"].includes(ext))?"PS1":"PS2";
+    S.games.push({title:f.name.replace(/\.[^.]+$/,""),recordKey:localKey("LIB",path.toLowerCase()),gameId:id||localKey("FILE",path.toLowerCase()),oplGameId:id||null,format:ext,platform,size:f.size,hasCover:false,hasIcon:false,source:path,folder:parts.length>1?parts[parts.length-2]:"ROOT"});
   }catch(e){log("تعذر تحليل "+f.name+": "+e.message);}
  }
  const ul=files.find(function(f){return f.name.toLowerCase()==="ul.cfg";});
@@ -176,7 +176,7 @@ async function scanSelectedFiles(fileList){
 function render(){
  const iso=S.games.filter(g=>g.format==='ISO').length,zso=S.games.filter(g=>g.format==='ZSO').length,ul=S.games.filter(g=>g.format==='UL').length,cov=S.games.filter(g=>g.hasCover).length;
  const miss=S.games.filter(g=>!effectiveId(g)||!g.hasCover||!g.hasIcon).length;
- $('total').textContent=S.games.length;$('iso').textContent=iso+zso;$('ul').textContent=ul;$('covers').textContent=cov;
+ $('total').textContent=S.games.length;$('iso').textContent=iso+zso;$('ul').textContent=ul;$('covers').textContent=cov;if($('ps1Count'))$('ps1Count').textContent=S.games.filter(g=>g.platform==='PS1').length;
  $('allCount').textContent=S.games.length;$('missingCount').textContent=miss;
  $('sGames').textContent=S.games.length;$('sIso').textContent=iso+zso;$('sUl').textContent=ul;$('sSize').textContent=fmt(S.games.reduce((a,g)=>a+g.size,0));
  $('csv').disabled=!S.games.length;$('rescan').disabled=!S.root;$('missing').disabled=!S.games.length;$('all').disabled=!S.games.length;
