@@ -78,20 +78,32 @@ async function inspect(){
  });
 }
 async function scan(){
- if(!("showDirectoryPicker"in window)){msg("اختيار المجلد غير مدعوم هنا. استخدم Chrome أو Edge على الحاسوب.",true);return;}
+ if(!("showDirectoryPicker"in window)){ $("fallbackPick").hidden=false; $("fallbackFiles").click(); return; }
  try{
   S.root=await showDirectoryPicker({mode:"readwrite"});
+  $("fallbackPick").hidden=true;
   $("driveName").textContent=S.root.name;$("driveDot").classList.add("on");$("driveInfo").textContent="تم اختيار مجلد التخزين";
   $("games").innerHTML='<tr><td colspan="9" class="empty">جارٍ الفحص...</td></tr>';
-  S.games=[...(await scanFolder(S.root,"DVD")),...(await scanFolder(S.root,"CD"))];
+  const dirs=[];for await(const ent of S.root.values())if(ent.kind==="directory")dirs.push(ent.name.toUpperCase());
+  S.games=[...(dirs.includes("DVD")?await scanFolder(S.root,dirs[dirs.indexOf("DVD")]):[]),...(dirs.includes("CD")?await scanFolder(S.root,dirs[dirs.indexOf("CD")]):[])];
+  for await(const ent of S.root.values()){if(ent.kind!=="file"||!/\.(iso|zso)$/i.test(ent.name))continue;try{const f=await ent.getFile(),isIso=/\.iso$/i.test(ent.name),id=isIso?await gameId(f):idFromName(ent.name);S.games.push({title:ent.name.replace(/\.(iso|zso)$/i,""),recordKey:localKey("LIB",ent.name.toLowerCase()),gameId:id||localKey("FILE",ent.name.toLowerCase()),oplGameId:id||null,format:isIso?"ISO":"ZSO",size:f.size,hasCover:false,hasIcon:false,source:ent.name});}catch(err){log("تعذر قراءة "+ent.name);}}
   try{S.games.push(...await parseUl(S.root,await S.root.getFileHandle("ul.cfg")));}catch(e){}
-  await hydrateMetadata();await inspect();try{await saveLibrary(S.games);}catch(dbError){log("تعذر حفظ فهرس الألعاب محلياً: "+dbError.message);}render();
-restoreLastScan();
-  const unknownUl=S.games.filter(g=>g.format==="UL"&&!effectiveId(g)).length;
-  const incompleteUl=S.games.filter(g=>g.format==="UL"&&!g.ulPartsComplete).length;
+  await hydrateMetadata();await inspect();try{await saveLibrary(S.games);}catch(dbError){log("تعذر حفظ فهرس الألعاب محلياً: "+dbError.message);}render();restoreLastScan();
+  const unknownUl=S.games.filter(g=>g.format==="UL"&&!effectiveId(g)).length,incompleteUl=S.games.filter(g=>g.format==="UL"&&!g.ulPartsComplete).length;
   log("اكتمل الفحص: "+S.games.length+" لعبة. ألعاب UL غير المكتملة: "+incompleteUl+".");
-  msg("اكتمل الفحص: "+S.games.length+" لعبة."+ (unknownUl?" · عيّن Game ID لألعاب UL من التفاصيل.":"")+(incompleteUl?" · تحقق من أجزاء UL الناقصة.":""));
+  msg("اكتمل الفحص: "+S.games.length+" لعبة."+(unknownUl?" · عيّن Game ID لألعاب UL من التفاصيل.":"")+(incompleteUl?" · تحقق من أجزاء UL الناقصة.":""));
  }catch(e){if(e.name!=="AbortError")msg("تعذر فحص المجلد: "+e.message,true);}
+}
+async function scanSelectedFiles(fileList){
+ const files=[...fileList];S.root=null;S.games=[];
+ for(const f of files.filter(x=>/\.(iso|zso)$/i.test(x.name))){
+  try{const isIso=/\.iso$/i.test(f.name),id=isIso?await gameId(f):idFromName(f.name),path=f.webkitRelativePath||f.name;S.games.push({title:f.name.replace(/\.(iso|zso)$/i,""),recordKey:localKey("LIB",path.toLowerCase()),gameId:id||localKey("FILE",path.toLowerCase()),oplGameId:id||null,format:isIso?"ISO":"ZSO",size:f.size,hasCover:false,hasIcon:false,source:path});}catch(e){log("تعذر تحليل "+f.name);}
+ }
+ const ul=files.find(f=>f.name.toLowerCase()==="ul.cfg");
+ if(ul){try{const b=new Uint8Array(await ul.arrayBuffer()),dec=new TextDecoder("ascii");for(let o=0,index=0;o+64<=b.length;o+=64,index++){const name=dec.decode(b.slice(o,o+32)).split("\0")[0].trim(),magic=dec.decode(b.slice(o+32,o+35)),startup=dec.decode(b.slice(o+35,o+47)).split("\0")[0].trim().toUpperCase(),parts=b[o+47],media=b[o+48];if(!name||magic!=="ul.")continue;const id=idFromName(startup),escaped=startup.replaceAll(".","\\."),pattern=new RegExp("^ul\\.[0-9a-f]{8}\\."+escaped+"\\.([0-9a-f]{2})$","i"),found=files.filter(f=>pattern.test(f.name)),nums=found.map(f=>parseInt(f.name.match(pattern)[1],16)),missing=[];for(let p=0;p<parts;p++)if(!nums.includes(p))missing.push(p);S.games.push({recordKey:localKey("LIB","UL|"+startup+"|"+name+"|"+index),title:name,gameId:id||localKey("UL",startup+"|"+name+"|"+index),oplGameId:id||null,format:"UL",size:found.reduce((n,f)=>n+f.size,0),hasCover:false,hasIcon:false,source:"ul.cfg",ulStartup:startup,ulParts:parts,ulAvailableParts:found.length,ulMissingParts:missing.length,ulMissingPartNumbers:missing,ulPartsComplete:parts>0&&!missing.length&&found.length===parts,ulPartNumbers:nums,ulMedia:media===0x12?"CD":media===0x14?"DVD":"UNKNOWN"});}}catch(e){log("تعذر تحليل ul.cfg: "+e.message);}}
+ await hydrateMetadata();try{await saveLibrary(S.games);}catch(e){log("تعذر حفظ الفهرس: "+e.message);}render();
+ $("driveName").textContent="ملفات مختارة";$("driveDot").classList.add("on");$("driveInfo").textContent="قراءة فقط · "+files.length+" ملفاً · لا يمكن الكتابة إلى USB من هذا المتصفح";
+ log("فحص الملفات المختارة: "+S.games.length+" لعبة.");msg("تم العثور على "+S.games.length+" لعبة من الملفات المختارة. وضع القراءة فقط.");
 }
 function render(){
  const iso=S.games.filter(g=>g.format==='ISO').length,zso=S.games.filter(g=>g.format==='ZSO').length,ul=S.games.filter(g=>g.format==='UL').length,cov=S.games.filter(g=>g.hasCover).length;
@@ -252,5 +264,5 @@ async function runDiagnostics(){
  if(!S.games.length)lines.push("لم يتم فحص وحدة تخزين بعد؛ اختر USB أولاً.");
  out.textContent=lines.join("\n");log("فحص سلامة المكتبة: "+report.issues.length+" ملاحظة، و"+art.invalid.length+" صورة تحتاج تصحيحاً.");
 }
-if($("runDiagnostics"))$("runDiagnostics").onclick=runDiagnostics;
+if($("runDiagnostics"))$("runDiagnostics").onclick=runDiagnostics;\nif($("fallbackPick"))$("fallbackPick").onclick=()=>$("fallbackFiles").click();\nif($("fallbackFiles"))$("fallbackFiles").addEventListener("change",e=>{if(e.target.files?.length)scanSelectedFiles(e.target.files);e.target.value="";});
 renderStorageCapabilities();
