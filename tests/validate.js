@@ -148,6 +148,11 @@ assert(html.includes('id="ps1Count"'),"PS1 count display missing");
 
 assert.equal((app.match(/resolvePlatform\(id,ext,title\)/g)||[]).length,2,"both scanners must use title-aware catalog platform resolution");
 assert(app.includes("function resolvePlatform(id,format,title)"),"title-aware catalog-first platform resolver missing");
+assert(app.includes("async function buildCueGame(cueEntry,entries,pathOf)"),"CUE descriptor parser missing");
+assert(app.includes("for(const match of cueText.matchAll(/^[\\s]*FILE"),"CUE FILE track references must be parsed");
+assert(app.includes('format:"CUE"'),"multi-track disc must be represented as one CUE game");
+assert(app.includes("const consumedBins=new Set()"),"CUE-referenced BIN tracks must be excluded from duplicate game entries");
+assert(app.includes("const cueFiles=gameFiles.filter"),"manual file selection must group CUE and BIN tracks");
 assert(app.includes("function normalizeCatalogTitle(value)"),"catalog title normalization for duplicate serials missing");
 assert(app.includes("function catalogSerial(value)"),"catalog matching must normalize dotted PS2 serials");
 assert(app.includes("function catalogOplId(record)"),"PS2 source serials must convert to OPL Game IDs");
