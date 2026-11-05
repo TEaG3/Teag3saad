@@ -270,7 +270,7 @@ async function scanSelectedFiles(fileList){
 function render(){
  const iso=S.games.filter(g=>g.format==='ISO').length,zso=S.games.filter(g=>g.format==='ZSO').length,ul=S.games.filter(g=>g.format==='UL').length,cov=S.games.filter(g=>g.hasCover).length;
  const miss=S.games.filter(g=>!effectiveId(g)||!g.hasCover||!g.hasIcon).length;
- $('total').textContent=S.games.length;$('iso').textContent=iso+zso;$('ul').textContent=ul;$('covers').textContent=cov;if($('ps1Count'))$('ps1Count').textContent=S.games.filter(g=>g.platform==='PS1').length;
+ $('total').textContent=S.games.length;$('iso').textContent=iso+zso;$('ul').textContent=S.games.filter(g=>g.platform==='PS2').length;$('covers').textContent=cov;if($('ps1Count'))$('ps1Count').textContent=S.games.filter(g=>g.platform==='PS1').length;
  $('allCount').textContent=S.games.length;$('missingCount').textContent=miss;
  $('sGames').textContent=S.games.length;$('sIso').textContent=iso+zso;$('sUl').textContent=ul;$('sSize').textContent=fmt(S.games.reduce((a,g)=>a+g.size,0));
  $('csv').disabled=!S.games.length;$('rescan').disabled=!S.root;$('missing').disabled=!S.games.length;$('all').disabled=!S.games.length;if($('downloadToApp'))$('downloadToApp').disabled=!S.games.length||!S.root;
