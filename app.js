@@ -360,9 +360,27 @@ async function putMetadata(v){const d=await getDb();return new Promise((resolve,
 async function removeMetadata(id){const d=await getDb();return new Promise((resolve,reject)=>{const tx=d.transaction("games","readwrite");tx.objectStore("games").delete(id);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});}
 async function readCatalogCache(){const d=await getDb();return new Promise((resolve,reject)=>{const q=d.transaction("catalog","readonly").objectStore("catalog").get("snapshot");q.onsuccess=()=>resolve(q.result?.data||null);q.onerror=()=>reject(q.error);});}
 async function writeCatalogCache(data){const d=await getDb();return new Promise((resolve,reject)=>{const tx=d.transaction("catalog","readwrite");tx.objectStore("catalog").put({id:"snapshot",data,savedAt:new Date().toISOString()});tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});}
-function findCatalogRecord(id){const key=String(id||"").toUpperCase().replace(/_/g,"-");return S.catalog.find(v=>String(v.serial||"").toUpperCase().replace(/_/g,"-")===key)||null;}
+function catalogSerial(value){
+ const id=String(value||"").trim().toUpperCase().replace(/_/g,"-");
+ const dotted=id.match(/^([A-Z]{4})-(\d{3})\.(\d{2})$/);
+ if(dotted)return dotted[1]+"-"+dotted[2]+dotted[3];
+ const flat=id.match(/^([A-Z]{4})-(\d{5})$/);
+ return flat?flat[1]+"-"+flat[2]:null;
+}
+function catalogOplId(record){
+ if(!record)return null;
+ const serial=catalogSerial(record.serial);if(!serial)return null;
+ if(record.platform==="PS1")return serial;
+ const match=serial.match(/^([A-Z]{4})-(\d{5})$/);
+ return match?match[1]+"_"+match[2].slice(0,3)+"."+match[2].slice(3):null;
+}
+function findCatalogRecord(id){
+ const key=catalogSerial(id),platform=isPs1Id(id)?"PS1":"PS2";
+ if(!key)return null;
+ return S.catalog.find(v=>v.platform===platform&&catalogSerial(v.serial)===key)||null;
+}
 async function syncCentralCatalog(){
- const validData=v=>v&&v.schemaVersion===1&&Array.isArray(v.games);
+ const validData=v=>v&&v.schemaVersion===1&&Array.isArray(v.games)&&v.games.length>=1000&&v.games.some(g=>g.platform==="PS1")&&v.games.some(g=>g.platform==="PS2");
  try{const response=await fetch("./data/game-catalog.json",{cache:"no-store"});if(!response.ok)throw new Error("HTTP "+response.status);const data=await response.json();if(!validData(data))throw new Error("invalid catalog schema");S.catalog=data.games;await writeCatalogCache(data);S.catalogStatus="متصل · "+S.catalog.length+" سجل مركزي";}
  catch(e){try{const cached=await readCatalogCache();if(validData(cached)){S.catalog=cached.games;S.catalogStatus="دون إنترنت · نسخة محلية · "+S.catalog.length+" سجل";}else S.catalogStatus="القاعدة غير متاحة";}catch(err){S.catalogStatus="القاعدة غير متاحة";}}
  await hydrateMetadata();if(S.games.length)render();const el=$("catalogStatus");if(el)el.textContent=S.catalogStatus;log("قاعدة الألعاب: "+S.catalogStatus+".");
@@ -370,7 +388,7 @@ async function syncCentralCatalog(){
 async function hydrateMetadata(){
  try{
   const rows=await allMetadata(),map=new Map(rows.map(v=>[v.gameId,v]));
-  S.games.forEach(g=>{const local=map.get(g.gameId)||null,central=findCatalogRecord(effectiveId(g));g.catalog=central;g.meta=local||(central?{title:central.title||g.title,genre:central.genre||"",region:central.region||"",year:central.year||"",publisher:central.publisher||"",developer:central.developer||""}:null);g.oplGameId=local?.oplGameId||(central?.serial?(isPs1Id(central.serial)?normalizePs1Id(central.serial):String(central.serial).replace("-","_")):null)||(valid(g.gameId)?g.gameId:null);});
+  S.games.forEach(g=>{const local=map.get(g.gameId)||null,central=findCatalogRecord(effectiveId(g));g.catalog=central;g.meta=local||(central?{title:central.title||g.title,genre:central.genre||"",region:central.region||"",year:central.year||"",publisher:central.publisher||"",developer:central.developer||""}:null);g.oplGameId=local?.oplGameId||catalogOplId(central)||(valid(g.gameId)?g.gameId:null);});
  }catch(e){log("تعذر تحميل قاعدة البيانات المحلية: "+e.message);}
 }
 function showGame(id){

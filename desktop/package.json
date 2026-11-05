@@ -1,18 +1,23 @@
 {
   "name": "saad-ps2-desktop",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Saad PS2 Ultimate Windows desktop application",
   "main": "main.cjs",
   "author": "Saad PS2",
   "license": "UNLICENSED",
   "scripts": {
     "stage": "node scripts/stage-site.cjs",
+    "smoke": "electron . --smoke-test",
+    "test": "node ../tests/validate.js",
     "dist:setup": "npm run stage && electron-builder --win nsis --x64 --config.win.artifactName=Saad-PS2-Setup-${version}.${ext}",
     "dist:win": "npm run dist:setup"
   },
   "devDependencies": {
-    "electron": "39.2.7",
-    "electron-builder": "26.0.12"
+    "electron": "45.2.3",
+    "electron-builder": "26.18.1"
+  },
+  "overrides": {
+    "tar": "7.5.22"
   },
   "build": {
     "appId": "com.saadps2.ultimate",

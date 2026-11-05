@@ -3,6 +3,8 @@ const { app, BrowserWindow, shell, protocol, net, ipcMain } = require("electron"
 const { pathToFileURL } = require("node:url");
 const path = require("node:path");
 const fs = require("node:fs/promises");
+const smokeTest = process.argv.includes("--smoke-test");
+const smokeErrors = [];
 
 protocol.registerSchemesAsPrivileged([{ scheme: "app", privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true } }]);
 
@@ -23,7 +25,37 @@ function createWindow() {
       webSecurity: true
     }
   });
-  window.once("ready-to-show", () => window.show());
+  window.webContents.on("console-message", (_event, level, message) => {
+    if (smokeTest && level >= 2) smokeErrors.push(message);
+  });
+  window.webContents.once("did-fail-load", (_event, code, description) => {
+    if (smokeTest) {
+      console.error("SMOKE FAIL: page load", code, description);
+      app.exit(1);
+    }
+  });
+  window.once("ready-to-show", async () => {
+    window.show();
+    if (!smokeTest) return;
+    try {
+      const result = await window.webContents.executeJavaScript(
+        '({title:document.title,database:!!window.PS2Database,desktop:window.saadDesktop?.isDesktop===true,downloadLinkHidden:!document.getElementById("downloadWindowsApp"),library:!!document.getElementById("library"),usbTest:!!document.getElementById("runUsbTest"),artwork:!!document.getElementById("downloadToApp")})'
+      );
+      const passed = result.title === "Saad PS2 Ultimate" &&
+        result.database && result.desktop && result.downloadLinkHidden &&
+        result.library && result.usbTest && result.artwork && smokeErrors.length === 0;
+      console.log(passed ? "SMOKE PASS: desktop UI, preload, database and controls loaded." :
+        "SMOKE FAIL: " + JSON.stringify({ result, consoleErrors: smokeErrors }));
+      app.exit(passed ? 0 : 1);
+    } catch (error) {
+      console.error("SMOKE FAIL:", error);
+      app.exit(1);
+    }
+  });
+  if (smokeTest) setTimeout(() => {
+    console.error("SMOKE FAIL: timed out while loading the desktop UI.");
+    app.exit(1);
+  }, 25000);
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith("https://")) shell.openExternal(url);
     return { action: "deny" };
@@ -115,7 +147,9 @@ app.whenReady().then(() => {
     return downloadArtwork(value);
   });
 
-  const siteRoot = path.resolve(process.resourcesPath, "app-site");
+  const siteRoot = app.isPackaged
+    ? path.resolve(process.resourcesPath, "app-site")
+    : path.resolve(__dirname, "app-site");
   protocol.handle("app", (request) => {
     const requestUrl = new URL(request.url);
     if (requestUrl.hostname === "artwork") {

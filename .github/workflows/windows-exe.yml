@@ -6,12 +6,14 @@ on:
     paths:
       - "desktop/**"
       - "index.html"
+      - "downloads.html"
       - "app.js"
       - "styles.css"
       - "ps2-database.js"
       - "manifest.webmanifest"
       - "sw.js"
       - "data/**"
+      - "scripts/**"
       - "tests/**"
       - ".github/workflows/windows-exe.yml"
   workflow_dispatch:
@@ -28,22 +30,92 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7.1.0
         with:
-          node-version: 22
-      - name: Install desktop build dependencies
+          node-version: 24
+          package-manager-cache: false
+      - name: Update central PS1/PS2 game catalog
+        run: node scripts/update-game-catalog.cjs
+      - name: Generate npm lockfile on first build
+        id: lockfile
         working-directory: desktop
-        run: npm install
+        shell: pwsh
+        run: |
+          if (Test-Path "package-lock.json") {
+            "created=false" >> $env:GITHUB_OUTPUT
+          } else {
+            npm install --package-lock-only --ignore-scripts --no-audit
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            "created=true" >> $env:GITHUB_OUTPUT
+          }
+      - name: Persist initial npm lockfile
+        if: steps.lockfile.outputs.created == 'true'
+        shell: pwsh
+        run: |
+          git fetch origin ${{ github.ref_name }}
+          git reset --hard origin/${{ github.ref_name }}
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add desktop/package-lock.json
+          git commit -m "Add reproducible Windows build lockfile"
+          git push origin "HEAD:${{ github.ref_name }}"
+      - name: Install locked desktop dependencies
+        working-directory: desktop
+        run: npm ci
+      - name: Audit desktop build dependencies
+        working-directory: desktop
+        run: npm audit --audit-level=high
+      - name: Validate application and catalog
+        run: node tests/validate.js
+      - name: Stage desktop application
+        working-directory: desktop
+        run: npm run stage
+      - name: Smoke-test Windows desktop startup
+        working-directory: desktop
+        run: npm run smoke
+      - name: Configure optional publisher certificate
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          if ($env:WINDOWS_CERTIFICATE_BASE64) {
+            if (-not $env:WINDOWS_CERTIFICATE_PASSWORD) { throw "WINDOWS_CERTIFICATE_PASSWORD is required when a PFX certificate is configured." }
+            $certificatePath = Join-Path $env:RUNNER_TEMP "saad-publisher.pfx"
+            $bytes = [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE_BASE64)
+            [System.IO.File]::WriteAllBytes($certificatePath, $bytes)
+            "CSC_LINK=$certificatePath" >> $env:GITHUB_ENV
+            "CSC_KEY_PASSWORD=$env:WINDOWS_CERTIFICATE_PASSWORD" >> $env:GITHUB_ENV
+            "SAAD_SIGNING_EXPECTED=true" >> $env:GITHUB_ENV
+            Write-Host "Publisher certificate configured."
+          } else {
+            "SAAD_SIGNING_EXPECTED=false" >> $env:GITHUB_ENV
+            Write-Host "No publisher certificate configured; this installer will be unsigned."
+          }
       - name: Build Windows Setup EXE
         working-directory: desktop
         run: npm run dist:setup
+      - name: Verify installer Authenticode signature
+        id: signature
+        shell: pwsh
+        run: |
+          $installer = "desktop/release/Saad-PS2-Setup-1.1.0.exe"
+          $signature = Get-AuthenticodeSignature -FilePath $installer
+          if ($env:SAAD_SIGNING_EXPECTED -eq "true" -and $signature.Status -ne "Valid") {
+            throw "A publisher certificate was configured, but Authenticode verification returned $($signature.Status)."
+          }
+          if ($signature.Status -eq "Valid") {
+            "status=Valid ($($signature.SignerCertificate.Subject))" >> $env:GITHUB_OUTPUT
+          } else {
+            "status=NotSigned" >> $env:GITHUB_OUTPUT
+          }
       - name: Upload Windows Setup installer as workflow artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.2
         with:
-          name: Saad-PS2-Windows-Setup
-          path: desktop/release/Saad-PS2-Setup-*.exe
+          name: Saad-PS2-Windows-Setup-1.1.0
+          path: desktop/release/Saad-PS2-Setup-1.1.0.exe
           if-no-files-found: error
           retention-days: 30
       - name: Remove obsolete assets from the latest release
@@ -57,17 +129,17 @@ jobs:
             done < <(gh release view desktop-latest --json assets --jq '.assets[].name')
           fi
       - name: Publish or update the latest Windows release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3.0.3
         with:
           tag_name: desktop-latest
           name: Saad PS2 Ultimate — Latest Windows Build
           body: |
             أحدث إصدار Windows من Saad PS2 Ultimate.
-
-            - Setup EXE: مثبت Windows مع اختصار لسطح المكتب وقائمة ابدأ.
-            - متوافق مع Windows 10 وWindows 11 (64-bit).
-            - Windows 7 غير مدعوم في إصدار Electron الحالي.
-            - إذا كان Windows يعرض تحذير الناشر، فهذا لأن الملف غير موقع رقمياً حالياً.
-          files: desktop/release/Saad-PS2-Setup-*.exe
+            - الإصدار: 1.1.0 — Setup EXE لويندوز 64-bit.
+            - متوافق مع Windows 10 وWindows 11.
+            - اختبار تشغيل Electron آلياً: نجح ضمن بيئة Windows CI.
+            - حالة توقيع Authenticode: ${{ steps.signature.outputs.status }}.
+            - اختبار USB/PS2 الحقيقي يحتاج تنفيذ قائمة الفحص على أجهزة فعلية.
+          files: desktop/release/Saad-PS2-Setup-1.1.0.exe
           make_latest: true
           fail_on_unmatched_files: true

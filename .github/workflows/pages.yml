@@ -3,10 +3,13 @@ name: Deploy Saad PS2 Ultimate to GitHub Pages
 on:
   push:
     branches: [main]
+  schedule:
+    - cron: "0 6 * * 1"
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
+  actions: write
   pages: write
   id-token: write
 
@@ -15,22 +18,64 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  sync-catalog:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v7.0.1
+        with:
+          ref: main
+      - name: Setup Node.js
+        uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Download and normalize PS1/PS2 catalog
+        run: node scripts/update-game-catalog.cjs
+      - name: Commit catalog when it changes
+        id: commit-catalog
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/game-catalog.json
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Catalog is already current."
+          else
+            git commit -m "Update central PlayStation game catalog"
+            git push origin HEAD:main
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Rebuild Windows release after catalog update
+        if: steps.commit-catalog.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run windows-exe.yml --ref main
+
   deploy:
+    needs: sync-catalog
+    runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Validate application
+      - name: Checkout latest main
+        uses: actions/checkout@v7.0.1
+        with:
+          ref: main
+      - name: Setup Node.js
+        uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Validate application and populated catalog
         run: node tests/validate.js
       - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6.0.0
       - name: Upload website
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v5.0.0
         with:
           path: .
       - name: Deploy
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5.0.1

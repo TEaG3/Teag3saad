@@ -5,8 +5,13 @@
   const v=String(value||"").trim().toUpperCase().replace(/-/g,"_");
   return ID.test(v)?v:null;
  }
+ function normalizeGameId(value){
+  const ps2=normalizeId(value);if(ps2)return ps2;
+  const ps1=String(value||"").trim().toUpperCase().replace(/_/g,"-");
+  return /^[A-Z]{4}-\d{5}$/.test(ps1)?ps1:null;
+ }
  function regionFromId(value){
-  const id=normalizeId(value);if(!id)return {code:"UNKNOWN",label:"غير محددة",confidence:"none"};
+  const id=normalizeGameId(value);if(!id)return {code:"UNKNOWN",label:"غير محددة",confidence:"none"};
   const p=id.slice(0,4);
   if(["SLES","SCES","SCED","SLED"].includes(p))return {code:"PAL",label:"PAL",confidence:"high"};
   if(["SLUS","SCUS"].includes(p))return {code:"NTSC-U",label:"NTSC-U",confidence:"high"};
@@ -27,7 +32,7 @@
   const list=Array.isArray(games)?games:[];
   const byId=new Map(),bySource=new Map(),issues=[];
   for(const g of list){
-   const id=normalizeId(g.oplGameId||g.gameId);
+   const id=normalizeGameId(g.oplGameId||g.gameId);
    if(id){if(!byId.has(id))byId.set(id,[]);byId.get(id).push(g);}
    const src=String(g.source||"").toLowerCase();
    if(src){if(!bySource.has(src))bySource.set(src,[]);bySource.get(src).push(g);}
@@ -38,7 +43,7 @@
   }
   for(const [id,rows] of byId)if(rows.length>1)issues.push({type:"duplicate-id",title:id,message:"المعرّف مرتبط بـ "+rows.length+" سجلات؛ تحقق من النسخ أو المناطق."});
   for(const [src,rows] of bySource)if(rows.length>1)issues.push({type:"duplicate-source",title:src,message:"مصدر الملف مكرر في الفهرس."});
-  return {total:list.length,identified:[...list].filter(g=>normalizeId(g.oplGameId||g.gameId)).length,missingId:list.filter(g=>!normalizeId(g.oplGameId||g.gameId)).length,duplicateIds:[...byId].filter(([,v])=>v.length>1).length,incompleteUl:list.filter(g=>g.format==="UL"&&!g.ulPartsComplete).length,issues,regions:list.reduce((o,g)=>{const r=regionFromId(g.oplGameId||g.gameId);o[r.code]=(o[r.code]||0)+1;return o;},{})};
+  return {total:list.length,identified:[...list].filter(g=>normalizeGameId(g.oplGameId||g.gameId)).length,missingId:list.filter(g=>!normalizeGameId(g.oplGameId||g.gameId)).length,duplicateIds:[...byId].filter(([,v])=>v.length>1).length,incompleteUl:list.filter(g=>g.format==="UL"&&!g.ulPartsComplete).length,issues,regions:list.reduce((o,g)=>{const r=regionFromId(g.oplGameId||g.gameId);o[r.code]=(o[r.code]||0)+1;return o;},{})};
  }
  async function inspectArt(root){
   const report={files:0,covers:0,icons:0,valid:[],invalid:[],missing:[]};
@@ -75,5 +80,5 @@
   const ios=/iPad|iPhone|iPod/.test(ua)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
   return {picker,write:picker&&secure,secure,ios,mode:picker&&secure?"direct":"limited",message:!secure?"يلزم HTTPS أو localhost للوصول المباشر إلى المجلدات.":picker?"يمكن للموقع القراءة والكتابة على وحدة مركّبة يتعرف عليها نظام التشغيل بعد منح الإذن؛ المتصفح لا يهيئ نظام الملفات ولا يقرأ القرص الخام.":ios?"Safari على iPad/iPhone لا يوفر هنا وصولاً عاماً مضموناً للقراءة والكتابة إلى USB.":"هذا المتصفح لا يوفر واجهة اختيار مجلد مع صلاحية الكتابة؛ يلزم متصفح متوافق أو تطبيق أصلي.",oplUsbFilesystems:"يعتمد التعرف على FAT/FAT32/exFAT على نظام التشغيل والمتصفح؛ توافق تشغيل USB داخل OPL مستقل ويتوقف على إصدار OPL وإعداداته. لا يمكن للموقع ضمان تشغيل كل نظام ملفات."};
  }
- window.PS2Database={normalizeId,regionFromId,classifyPlatform,inspectLibrary,inspectArt,storageCapabilities};
+ window.PS2Database={normalizeId,normalizeGameId,regionFromId,classifyPlatform,inspectLibrary,inspectArt,storageCapabilities};
 })();

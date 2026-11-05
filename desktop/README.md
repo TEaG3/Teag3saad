@@ -6,15 +6,15 @@ This isolated Electron project builds one Windows x64 deliverable:
 
 The Portable EXE target has been removed. The build stages the current web files from the repository root. Electron runs with `nodeIntegration: false`, `contextIsolation: true`, sandboxing enabled, and no Node filesystem API exposed to the renderer. The app continues to use the browser File System Access API for user-authorized folders.
 
-Build locally on Windows with Node.js 22:
+Build locally on Windows with Node.js 24:
 
 ```powershell
 cd desktop
-npm install
+npm ci
 npm run dist:setup
 ```
 
-Output is written to `desktop/release/Saad-PS2-Setup-1.0.0.exe`. GitHub Actions performs this build automatically when desktop or web application files change, and also supports manual runs. This binary is not code-signed; Windows SmartScreen may show an unknown-publisher warning until a trusted code-signing certificate is configured.
+Output is written to `desktop/release/Saad-PS2-Setup-1.1.0.exe`. GitHub Actions performs this build automatically when desktop or web application files change, and also supports manual runs. The workflow verifies Authenticode status. A trusted publisher certificate is optional and must be provided through repository secrets; the release states whether the published file is Valid or NotSigned.
 
 
 ## Online artwork library
@@ -29,3 +29,7 @@ The renderer receives only two narrow preload methods for artwork lookup/downloa
 ## OPL USB artwork export
 
 Use **تنزيل الكل وحفظه في ART** after selecting the USB game device. The Windows downloader retrieves the source cover online and caches the original under the current Windows user's profile. It then writes OPL files to the USB root's `ART/` directory (not inside `CD/` or `DVD/`): `<Game_ID>_COV.jpg` at 140×200 and `<Game_ID>_ICO.png` at 64×64. Each saved file is reopened and decoded before it is counted as successful. In OPL, enable **Display Settings → Enable Cover Art** and enable the device holding the games/art. For a multi-device setup, OPL requires the ART folder on each active device. A source repository may not have artwork for every regional game release.
+
+
+## Automated smoke test
+Run `npm run stage` then `npm run smoke` on Windows to launch Electron and verify the UI, preload bridge, database engine and essential controls. This does not test a physical USB device or a PS2 console.
