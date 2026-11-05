@@ -97,7 +97,7 @@ async function inspect(){
  return report;
 }
 async function scan(){
- if(!("showDirectoryPicker"in window)){ $("fallbackPick").hidden=false; $("fallbackFilesPick").hidden=false; msg("هذا المتصفح لا يدعم الكتابة المباشرة إلى USB. اختر الملفات يدوياً؛ تنزيل الأغلفة إلى الفلاش يتطلب متصفح Chromium يدعم اختيار المجلدات."); return; }
+ if(!("showDirectoryPicker"in window)){ $("fallbackPick").hidden=false; $("fallbackFilesPick").hidden=false; msg("تعذر فتح وحدة التخزين. يمكنك اختيار ملفات الألعاب لبدء الفحص."); return; }
  try{
   S.root=await showDirectoryPicker({mode:"readwrite"});
   $("fallbackPick").hidden=true;
@@ -321,7 +321,7 @@ async function restoreCachedArtwork(){
  }
 }
 async function downloadArtworkToApp(){
- if(!S.root){msg("اختر وحدة USB أولاً؛ سيتم الحفظ داخل ART ليقرأها OPL.",true);return;}
+ if(!S.root){msg("اختر الفلاش أولاً.",true);return;}
  // The native Windows downloader caches the original online cover.
  // download(false) then creates and verifies cover files in ART and icons in ICONS.
  await download(false);
@@ -331,7 +331,7 @@ async function ensureWritePermission(){
  if(typeof S.root.queryPermission==="function"){
   let permission=await S.root.queryPermission({mode:"readwrite"});
   if(permission!=="granted"&&typeof S.root.requestPermission==="function")permission=await S.root.requestPermission({mode:"readwrite"});
-  if(permission!=="granted")throw new Error("لم تمنح صلاحية الكتابة والقراءة.");
+  if(permission!=="granted")throw new Error("USB_ACCESS");
  }
 }
 async function save(dir,name,blob){
@@ -355,7 +355,7 @@ async function verifyUsbWriteAccess(){
   await S.root.removeEntry(name);return true;
  }catch(error){
   if(handle){try{await S.root.removeEntry(name);}catch(e){}}
-  throw new Error("تعذرت الكتابة على الفلاش. تحقق من صلاحية الكتابة وأن Windows تعرّف على exFAT، ثم أعد اختيار الوحدة. التفاصيل: "+(error.message||error));
+  throw new Error("USB_WRITE_FAILED");
  }
 }
 async function verifySavedArt(dir,name,width,height){
@@ -437,7 +437,7 @@ async function download(onlyMissing){
   $("progressText").textContent="تعذر الحفظ على وحدة التخزين";
   $("progressDetail").textContent=e.message||String(e);
   log("توقف تنزيل الصور: "+(e.message||e));
-  msg("فشل اختبار/صلاحية الكتابة على USB: "+(e.message||e),true);
+  msg("تعذر حفظ الصور على الفلاش. أعد توصيله وتحقق من سلامته ثم حاول مجدداً.",true);
  }
 }
 function csv(){
@@ -537,7 +537,7 @@ async function saveGameMeta(){
  if(rating&&(!Number.isFinite(Number(rating))||Number(rating)<0||Number(rating)>10)){msg("التقييم يجب أن يكون بين 0 و10.",true);return;}
  const row={gameId:g.gameId,oplGameId:oplGameId||null,title:$("metaTitle").value.trim().slice(0,120),genre:$("metaGenre").value.trim().slice(0,60),region:$("metaRegion").value.trim().slice(0,30),year,rating,notes:$("metaNotes").value.trim().slice(0,1000),updatedAt:new Date().toISOString()};
  try{await putMetadata(row);g.meta=row;g.oplGameId=row.oplGameId||(valid(g.gameId)?g.gameId:null);await inspect();$("gameDialog").hidden=true;render();log("حُفظت بيانات "+g.gameId+" محلياً.");msg("تم حفظ بيانات اللعبة.");}
- catch(e){msg("فشل الحفظ: "+e.message,true);}
+ catch(e){msg("تعذر حفظ البيانات. أعد المحاولة، وإذا استمرت المشكلة فتحقق من الفلاش.",true);}
 }
 async function backupDb(){try{const payload={app:"Saad PS2 Ultimate",schema:2,exportedAt:new Date().toISOString(),games:await allMetadata(),library:await allLibrary()},url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:"application/json"})),a=document.createElement("a");a.href=url;a.download="saad-ps2-database-backup.json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1200);msg("تم إنشاء النسخة الاحتياطية.");}catch(e){msg("تعذر إنشاء النسخة: "+e.message,true);}}
 async function restoreDb(file){
