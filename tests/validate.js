@@ -50,6 +50,6 @@ assert(html.includes("SLUS-00896"),"PS1 serial format hint missing");
 assert(app.includes('replace(/\\\\\\\\/g,"/")'),"selected-file path normalization must handle Windows separators");
 assert(app.includes('return /\\\\.(iso|zso)$/i.test(f.name);')||app.includes('return /\\.(iso|zso)$/i.test(f.name);'),"selected ISO/ZSO extension matcher missing");
 assert(app.includes('split("\\0")'),"UL config must split null-terminated fields");
-assert(sw.includes("saad-ps2-v7"),"service worker cache must be bumped after app changes");
+assert(sw.includes("saad-ps2-v8"),"service worker cache must be bumped after PS1 artwork changes");
 
 console.log("PASS: JS syntax, manifest, static DOM references, database ID/region checks, duplicate and UL diagnostics.");
