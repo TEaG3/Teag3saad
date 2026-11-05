@@ -238,7 +238,7 @@ $("restoreFile").onchange=e=>{if(e.target.files[0])restoreDb(e.target.files[0]);
 render();
 function renderStorageCapabilities(){
  const c=window.PS2Database?.storageCapabilities();if(!c)return;
- const e=$("storageSupport");e.innerHTML="<b>دعم وحدات التخزين:</b> "+esc(c.message)+"<br><b>الوصول المباشر:</b> "+(c.write?"قراءة وكتابة بعد موافقة المستخدم":"غير متاح في هذا المتصفح")+(c.ios?" · جهاز iPad/iPhone":"");
+ const e=$("storageSupport");e.innerHTML="<b>دعم وحدات التخزين على الجهاز:</b> "+esc(c.message)+"<br><b>صلاحية الموقع:</b> "+(c.write?"قراءة وكتابة بعد موافقة المستخدم":"الوصول المباشر للكتابة غير متاح")+(c.ios?" · جهاز iPad/iPhone":"")+"<br><b>توافق OPL USB:</b> "+esc(c.oplUsbFilesystems);
 }
 async function runDiagnostics(){
  const out=$("diagnosticResults");out.hidden=false;out.textContent="جارٍ فحص المكتبة ومجلد ART...";
