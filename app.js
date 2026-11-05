@@ -5,15 +5,14 @@ const S={root:null,offline:null,games:[],filter:"all",query:"",logs:[],busy:fals
 if(window.saadDesktop?.isDesktop)document.getElementById("downloadWindowsApp")?.remove();
 const isPs1Id=id=>/^[A-Z]{4}-\d{5}$/.test(String(id||"").toUpperCase().replace("_","-"));
 const normalizePs1Id=id=>String(id||"").toUpperCase().replace("_","-");
-function artworkIdentity(id){
- const value=String(id||"").toUpperCase();
- if(isPs1Id(value))return {platform:"ps1",serial:normalizePs1Id(value)};
- const match=value.match(/^([A-Z]{4})[_-](\d{3})\.(\d{2})$/);
- if(match)return {platform:"ps2",serial:match[1]+"-"+match[2]+match[3]};
+function artworkIdentity(id,platformHint){
+ const value=String(id||"").trim().toUpperCase(),hint=String(platformHint||"").toLowerCase();
+ if(hint==="ps1"||isPs1Id(value)){const serial=catalogSerial(value);return serial?{platform:"ps1",serial}:null;}
+ if(hint==="ps2"||/^[A-Z]{4}[_-]\d{3}\.\d{2}$/.test(value)){const serial=catalogSerial(value);return serial?{platform:"ps2",serial}:null;}
  return null;
 }
-function coverUrls(id){
- const identity=artworkIdentity(id);
+function coverUrls(id,platformHint){
+ const identity=artworkIdentity(id,platformHint);
  if(!identity)return [];
  const repository=identity.platform==="ps1"?"psx-covers":"ps2-covers";
  return ["https://raw.githubusercontent.com/xlenore/"+repository+"/main/covers/default/"+identity.serial+".jpg"];
@@ -24,7 +23,12 @@ function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&l
 function valid(id){const value=String(id||"").toUpperCase();return /^[A-Z]{4}_\d{3}\.\d{2}$/.test(value.replace("-","_"))||isPs1Id(value);}
 function validRecordKey(id){return valid(id)||/^(UL|FILE)_[A-F0-9]{8}$/.test(String(id||""));}
 function localKey(prefix,value){let h=2166136261;for(const c of String(value)){h^=c.charCodeAt(0);h=Math.imul(h,16777619);}return prefix+"_"+(h>>>0).toString(16).toUpperCase().padStart(8,"0");}
-function effectiveId(g){const id=g?.oplGameId||(valid(g?.gameId)?g.gameId:"");if(isPs1Id(id))return normalizePs1Id(id);return valid(id)?String(id).toUpperCase().replace("-","_"):"";}
+function effectiveId(g){
+ const id=g?.oplGameId||(valid(g?.gameId)?g.gameId:"");
+ if(g?.platform==="PS1"||g?.catalog?.platform==="PS1")return catalogSerial(id)||"";
+ if(isPs1Id(id))return normalizePs1Id(id);
+ return valid(id)?String(id).toUpperCase().replace("-","_"):"";
+}
 function idFromName(name){const value=String(name||"").toUpperCase(),ps1=value.match(/\b([A-Z]{4}[-_]\d{5})\b/);if(ps1)return normalizePs1Id(ps1[1]);const m=value.match(/\b([A-Z]{4}[_-]\d{3}\.\d{2})\b/);return m?m[1].replace("-","_"):null;}
 function fmt(n){if(!n)return "—";let u=["B","KB","MB","GB"],i=0;while(n>=1024&&i<3){n/=1024;i++;}return n.toFixed(i?1:0)+" "+u[i];}
 async function gameId(file){
@@ -140,7 +144,7 @@ async function scanGameTree(dir,prefix){
   try{
    let file=await ent.getFile(),id=await extractDiscId(file);
    if(ext==="cue"&&!id){const companion=entries.find(e=>e.kind==="file"&&e.name.toLowerCase()===base+".bin");if(companion){file=await companion.getFile();id=await extractDiscId(file);}}
-   const platform=window.PS2Database.classifyPlatform(id,ext);
+   const platform=resolvePlatform(id,ext);
    const path=(prefix?prefix+"/":"")+ent.name;
    out.push({title:ent.name.replace(/\.[^.]+$/,""),recordKey:localKey("LIB",path.toLowerCase()),gameId:id||localKey("FILE",path.toLowerCase()),oplGameId:id||null,format:ext.toUpperCase(),platform,size:file.size,hasCover:false,hasIcon:false,source:path});
   }catch(e){log("تعذر قراءة "+ent.name+": "+e.message);}
@@ -158,7 +162,7 @@ async function scanSelectedFiles(fileList){
  for(let i=0;i<gameFiles.length;i++){
   const f=gameFiles[i];
   try{
-    const path=pathOf(f),parts=path.split("/"),id=await extractDiscId(f),ext=f.name.split(".").pop().toUpperCase(),platform=window.PS2Database.classifyPlatform(id,ext);
+    const path=pathOf(f),parts=path.split("/"),id=await extractDiscId(f),ext=f.name.split(".").pop().toUpperCase(),platform=resolvePlatform(id,ext);
     S.games.push({title:f.name.replace(/\.[^.]+$/,""),recordKey:localKey("LIB",path.toLowerCase()),gameId:id||localKey("FILE",path.toLowerCase()),oplGameId:id||null,format:ext,platform,size:f.size,hasCover:false,hasIcon:false,source:path,folder:parts.length>1?parts[parts.length-2]:"ROOT"});
   }catch(e){log("تعذر تحليل "+f.name+": "+e.message);}
  }
@@ -201,13 +205,13 @@ function render(){
  $('csv').disabled=!S.games.length;$('rescan').disabled=!S.root;$('missing').disabled=!S.games.length;$('all').disabled=!S.games.length;if($('downloadToApp'))$('downloadToApp').disabled=!S.games.length||!S.root;
  const rows=S.games.filter(g=>(!S.query||(((g.meta?.title||g.title)+' '+(effectiveId(g)||g.gameId)).toLowerCase().includes(S.query)))&&(S.filter==='all'||(S.filter==='missing'&&(!effectiveId(g)||!g.hasCover||!g.hasIcon))||S.filter===g.format));
  $('games').innerHTML=rows.length?rows.map(g=>{
-  const id=effectiveId(g),displayId=id||g.gameId,cover=g.artworkDataUrl||(id?coverUrls(id)[0]:'');
+  const id=effectiveId(g),displayId=id||g.gameId,cover=g.artworkDataUrl||(id?coverUrls(id,g.platform||g.catalog?.platform)[0]:'');
   const partsCell=g.format==='UL'?('<span class="tag '+(g.ulPartsComplete?'ok':'bad')+'">'+g.ulAvailableParts+'/'+g.ulParts+'</span>'):'—';
   return '<tr><td>'+(cover?'<img class="cover" src="'+cover+'" onerror="this.style.visibility=\'hidden\'" alt="">':'—')+'</td><td>'+esc(g.meta?.title||g.title)+'</td><td class="id">'+esc(displayId)+'</td><td>'+g.format+'</td><td>'+fmt(g.size)+'</td><td>'+partsCell+'</td><td><span class="tag '+(g.hasCover?'ok':'bad')+'">'+(g.hasCover?'متوفر':'ناقص')+'</span></td><td><span class="tag '+(g.hasIcon?'ok':'bad')+'">'+(g.hasIcon?'متوفر':'ناقص')+'</span></td><td><button class="row-action" data-game="'+esc(g.gameId)+'">تفاصيل</button></td></tr>';
  }).join(''):'<tr><td colspan="9" class="empty">لا توجد نتائج.</td></tr>';
 }
-async function fetchArt(id){
- const identity=artworkIdentity(id);
+async function fetchArt(id,platformHint){
+ const identity=artworkIdentity(id,platformHint);
  if(!identity)throw new Error("Game ID غير صالح لمصدر الأغلفة.");
  if(window.saadDesktop?.downloadArtwork){
   const result=await window.saadDesktop.downloadArtwork(identity);
@@ -222,7 +226,7 @@ async function fetchArt(id){
   }
  }
  let lastError="الصورة غير موجودة في مصدر الأغلفة.";
- for(const url of coverUrls(id)){
+ for(const url of coverUrls(id,platformHint)){
   try{
    const response=await fetch(url,{cache:"no-store"});
    if(!response.ok){lastError="مصدر الأغلفة أعاد HTTP "+response.status+".";continue;}
@@ -237,7 +241,7 @@ async function fetchArt(id){
 async function restoreCachedArtwork(){
  if(!window.saadDesktop?.getArtwork)return;
  for(const game of S.games){
-  const identity=artworkIdentity(effectiveId(game));
+  const identity=artworkIdentity(effectiveId(game),game.platform||game.catalog?.platform);
   if(!identity)continue;
   try{
    const result=await window.saadDesktop.getArtwork(identity);
@@ -298,7 +302,7 @@ async function toPng(blob){return convertArt(blob,"image/png",64,64,true);}
 async function download(onlyMissing){
  if(!S.root){msg("اختر وحدة التخزين أولاً.",true);return;}
  try{await ensureWritePermission();}catch(e){msg("تعذرت صلاحية الكتابة: "+e.message,true);return;}
- const list=S.games.filter(g=>valid(effectiveId(g))&&(!onlyMissing||!g.hasCover||!g.hasIcon));
+ const list=S.games.filter(g=>valid(effectiveId(g))&&!!artworkIdentity(effectiveId(g),g.platform||g.catalog?.platform)&&(!onlyMissing||!g.hasCover||!g.hasIcon));
  if(!list.length){msg("لا توجد صور قابلة للحفظ. لألعاب UL أدخل Game ID الصحيح من تفاصيل اللعبة أولاً.",true);return;}
  const art=await S.root.getDirectoryHandle("ART",{create:true});
  $("progress").hidden=false;
@@ -311,7 +315,7 @@ async function download(onlyMissing){
   $("progressDetail").textContent="Game ID: "+id;
   let coverOk=false,iconOk=false;
   try{
-   const blob=await fetchArt(id);
+   const blob=await fetchArt(id,g.platform||g.catalog?.platform);
    if(!blob)throw new Error("مصدر الغلاف لم يرجع صورة قابلة للتنزيل.");
    const cover=await toJpeg(blob),icon=await toPng(blob);
    const coverName=id+"_COV.jpg",iconName=id+"_ICO.png";
@@ -375,9 +379,19 @@ function catalogOplId(record){
  return match?match[1]+"_"+match[2].slice(0,3)+"."+match[2].slice(3):null;
 }
 function findCatalogRecord(id){
- const key=catalogSerial(id),platform=isPs1Id(id)?"PS1":"PS2";
- if(!key)return null;
- return S.catalog.find(v=>v.platform===platform&&catalogSerial(v.serial)===key)||null;
+ const key=catalogSerial(id);if(!key)return null;
+ const matches=S.catalog.filter(v=>catalogSerial(v.serial)===key&&["PS1","PS2"].includes(v.platform));
+ if(matches.length===1)return matches[0];
+ if(matches.length>1){
+  const preferred=isPs1Id(id)?"PS1":/^[A-Z]{4}[_-]\d{3}\.\d{2}$/.test(String(id||"").toUpperCase())?"PS2":null;
+  return preferred?matches.find(v=>v.platform===preferred)||null:null;
+ }
+ return null;
+}
+function resolvePlatform(id,format){
+ const record=findCatalogRecord(id);
+ if(record)return record.platform;
+ return window.PS2Database.classifyPlatform(id,format);
 }
 async function syncCentralCatalog(){
  const validData=v=>v&&v.schemaVersion===1&&Array.isArray(v.games)&&v.games.length>=1000&&v.games.some(g=>g.platform==="PS1")&&v.games.some(g=>g.platform==="PS2");
@@ -388,7 +402,12 @@ async function syncCentralCatalog(){
 async function hydrateMetadata(){
  try{
   const rows=await allMetadata(),map=new Map(rows.map(v=>[v.gameId,v]));
-  S.games.forEach(g=>{const local=map.get(g.gameId)||null,central=findCatalogRecord(effectiveId(g));g.catalog=central;g.meta=local||(central?{title:central.title||g.title,genre:central.genre||"",region:central.region||"",year:central.year||"",publisher:central.publisher||"",developer:central.developer||""}:null);g.oplGameId=local?.oplGameId||catalogOplId(central)||(valid(g.gameId)?g.gameId:null);});
+  S.games.forEach(g=>{
+   const local=map.get(g.gameId)||null,rawId=g.oplGameId||g.gameId,central=findCatalogRecord(rawId);
+   g.catalog=central;if(central)g.platform=central.platform;
+   g.meta=local||(central?{title:central.title||g.title,genre:central.genre||"",region:central.region||"",year:central.year||"",publisher:central.publisher||"",developer:central.developer||""}:null);
+   g.oplGameId=local?.oplGameId||catalogOplId(central)||(valid(g.gameId)?g.gameId:null);
+  });
  }catch(e){log("تعذر تحميل قاعدة البيانات المحلية: "+e.message);}
 }
 function showGame(id){
