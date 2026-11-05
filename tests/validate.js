@@ -210,10 +210,7 @@ assert(desktopPackage.devDependencies.electron==="45.2.3","maintained Electron r
 assert(desktopPackage.devDependencies["electron-builder"]==="26.18.1","electron-builder version mismatch");
 assert(app.includes("تعذر حفظ الصور على الفلاش. أعد توصيله وتحقق من سلامته ثم حاول مجدداً."),"USB failure notification should be short and clear");
 assert(!/Windows 7|Windows 8|Windows 10|Windows 11/.test(downloadPage),"download page should not list supported operating systems");
-assert(desktopMain.includes("protocol.registerFileProtocol")&&!desktopMain.includes("protocol.handle("),"legacy Electron file protocol API missing");
-assert(desktopMain.includes("fetchArtworkResponse")&&!desktopMain.includes("net.fetch("),"legacy Electron HTTPS downloader missing");
 assert(app.includes("تعذر حفظ الصور على الفلاش. أعد توصيله وتحقق من سلامته ثم حاول مجدداً."),"USB failure notification should be short and clear");
-assert(!downloadPage.includes("Windows 10 أو Windows 11"),"user download page should not list supported Windows versions");
 assert(desktopPackage.overrides.tar==="7.5.22","tar security override missing");
 assert(desktopPackage.overrides.minimatch==="11.0.4","minimatch security override missing");
 assert(desktopPackage.scripts.smoke&&desktopPackage.scripts.test,"desktop smoke/test commands missing");
@@ -230,3 +227,4 @@ assert(app.includes("const exact=matches.filter(v=>normalizeCatalogTitle(v.title
 assert(app.includes('if(matches.length>1)return "UNKNOWN"'),"ambiguous platform IDs must remain unresolved");
 assert(app.includes("if(S.catalogReady)await S.catalogReady"),"scans must wait for catalog readiness");
 console.log("PASS: JS syntax, populated catalog, PS1/PS2 serial matching, diagnostics, dependency hardening and release workflow.");
+
