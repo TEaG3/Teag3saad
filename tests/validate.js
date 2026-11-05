@@ -26,6 +26,10 @@ vm.runInNewContext(engine,sandbox);
 const db=sandbox.window.PS2Database;
 assert.equal(db.normalizeId("slus-203.12"),"SLUS_203.12");
 assert.equal(db.normalizeId("NOT_A_GAME"),null);
+assert.equal(db.classifyPlatform("SLUS-00896","BIN"),"PS1");
+assert.equal(db.classifyPlatform("SLUS_203.12","BIN"),"PS2");
+assert.equal(db.classifyPlatform(null,"CHD"),"UNKNOWN");
+assert.equal(db.classifyPlatform(null,"ISO"),"PS2");
 assert.equal(db.regionFromId("SLES_123.45").code,"PAL");
 assert.equal(db.regionFromId("SLUS_203.12").code,"NTSC-U");
 const report=db.inspectLibrary([
@@ -68,4 +72,6 @@ assert(app.includes("extractDiscId"),"disc serial extractor missing");
 assert(app.includes("await download(true)"),"automatic missing-art download missing");
 assert(html.includes('id="ps1Count"'),"PS1 count display missing");
 
-console.log("PASS: JS syntax, manifest, static DOM references, database ID/region checks, duplicate and UL diagnostics.");
+assert(app.includes("window.PS2Database.classifyPlatform(id,ext)"),"recursive scanner must use verified platform classifier");
+assert(app.includes("window.PS2Database.classifyPlatform(id,ext)"),"selected-file scanner must use verified platform classifier");
+console.log("PASS: JS syntax, manifest, static DOM references, platform classification, database ID/region checks, duplicate and UL diagnostics.");
