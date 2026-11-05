@@ -37,7 +37,9 @@ assert(app.includes("await verifySavedArt(art,coverName,140,200)"),"cover verifi
 assert(app.includes("await verifySavedArt(art,iconName,64,64)"),"icon verification after saving missing");
 assert(html.includes('src="./ps2-database.js"'),"database engine must load before app");
 assert(html.includes('id="runDiagnostics"'),"diagnostics button missing");
-assert(html.includes('id="downloadToApp"'),"in-app online artwork download button missing");
+assert(html.includes('id="downloadToApp"'),"online-to-OPL ART export button missing");
+assert(app.includes("await download(false)"),"full artwork export button must write all covers to ART");
+assert(app.includes('const coverName=id+"_COV.jpg",iconName=id+"_ICO.png"'),"OPL ART filenames must use Game ID suffixes");
 assert(html.includes('id="runUsbTest"'),"real USB write/read test button missing");
 assert(html.includes('id="usbTestResults"'),"USB test result panel missing");
 assert(sw.includes("./ps2-database.js"),"service worker must cache database engine");
@@ -90,7 +92,7 @@ assert(engine.includes("valid:[]"),"artwork inspection must return verified file
 assert(engine.includes("createImageBitmap(file)"),"artwork inspection must decode image content");
 assert(!app.includes("\\nif("),"literal escaped newline broke app.js syntax");
 assert((app.match(/fallbackFiles.*addEventListener\("change"/g)||[]).length===1,"fallback handlers must be unique");
-assert(sw.includes("saad-ps2-v13"),"service worker cache must be bumped");
+assert(sw.includes("saad-ps2-v15"),"service worker cache must be bumped");
 assert(html.includes("توافق أنظمة Windows"),"Windows compatibility note missing");
 assert(app.includes("xlenore/psx-covers/main/covers/default/"),"PS1 cover source missing");
 assert(app.includes("function valid(id){const value=String(id||\"\").toUpperCase();return /^[A-Z]{4}_\\d{3}\\.\\d{2}$/.test(value.replace(\"-\",\"_\"))||isPs1Id(value);}"),"PS1 serial validation missing");
