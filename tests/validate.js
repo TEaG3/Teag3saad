@@ -42,6 +42,10 @@ assert(!app.includes("\\nif("),"literal escaped newline broke app.js syntax");
 assert((app.match(/fallbackFiles.*addEventListener\("change"/g)||[]).length===1,"fallback handlers must be unique");
 assert(sw.includes("saad-ps2-v6"),"service worker cache must be bumped");
 assert(html.includes("توافق أنظمة Windows"),"Windows compatibility note missing");
+assert(app.includes("xlenore/psx-covers/main/covers/default/"),"PS1 cover source missing");
+assert(app.includes("function valid(id){const value=String(id||\"\").toUpperCase();return /^[A-Z]{4}_\\d{3}\\.\\d{2}$/.test(value.replace(\"-\",\"_\"))||isPs1Id(value);}"),"PS1 serial validation missing");
+assert(app.includes("normalizePs1Id"),"PS1 serial normalization missing");
+assert(html.includes("SLUS-00896"),"PS1 serial format hint missing");
 
 assert(app.includes('replace(/\\\\\\\\/g,"/")'),"selected-file path normalization must handle Windows separators");
 assert(app.includes('return /\\\\.(iso|zso)$/i.test(f.name);')||app.includes('return /\\.(iso|zso)$/i.test(f.name);'),"selected ISO/ZSO extension matcher missing");
