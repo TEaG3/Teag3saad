@@ -1,6 +1,8 @@
 "use strict";
 const $=id=>document.getElementById(id);
 const S={root:null,offline:null,games:[],filter:"all",query:"",logs:[],busy:false,db:null,activeGame:null,catalog:[],catalogStatus:"جارٍ تحميل القاعدة"};
+// Hide the website installer link only inside the Electron desktop application.
+if(window.saadDesktop?.isDesktop)document.getElementById("downloadWindowsApp")?.remove();
 const isPs1Id=id=>/^[A-Z]{4}-\d{5}$/.test(String(id||"").toUpperCase().replace("_","-"));
 const normalizePs1Id=id=>String(id||"").toUpperCase().replace("_","-");
 function artworkIdentity(id){
