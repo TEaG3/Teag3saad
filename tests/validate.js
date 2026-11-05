@@ -71,9 +71,9 @@ assert(desktopWorkflow.includes("npm ci")&&desktopWorkflow.includes("npm audit -
 assert(desktopWorkflow.includes("npm run smoke")&&desktopMain.includes("--smoke-test"),"Windows workflow must smoke-test Electron startup");
 assert(desktopWorkflow.includes("WINDOWS_CERTIFICATE_BASE64")&&desktopWorkflow.includes("Get-AuthenticodeSignature"),"optional Authenticode signing and verification missing");
 assert(!downloadPage.includes("Portable"),"download page must not mention Portable edition");
-assert(downloadPage.includes("Saad-PS2-Setup-1.1.2.exe"),"download page must link Windows Setup installer");
+assert(downloadPage.includes("Saad-PS2-Setup-1.1.3.exe"),"download page must link Windows Setup installer");
 assert(downloadPage.includes("SmartScreen")&&downloadPage.includes("متطلبات التشغيل"),"download page must explain Windows security and requirements");
-assert(desktopWorkflow.includes("softprops/action-gh-release@v3.0.3")&&desktopWorkflow.includes("tag_name: desktop-latest")&&desktopWorkflow.includes("make_latest: true")&&desktopWorkflow.includes("Saad-PS2-Setup-1.1.2.exe"),"successful Windows Setup builds must publish the versioned installer");
+assert(desktopWorkflow.includes("softprops/action-gh-release@v3.0.3")&&desktopWorkflow.includes("tag_name: desktop-latest")&&desktopWorkflow.includes("make_latest: true")&&desktopWorkflow.includes("Saad-PS2-Setup-1.1.3.exe"),"successful Windows Setup builds must publish the versioned installer");
 const ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(x=>x[1]);
 assert.equal(new Set(ids).size,ids.length,"duplicate HTML IDs");
 const refs=[...app.matchAll(/\$\("([^"]+)"\)/g)].map(x=>x[1]);
@@ -120,7 +120,7 @@ assert(engine.includes("legacyIcons:0"),"legacy icon migration report missing");
 assert(engine.includes("createImageBitmap(file)"),"artwork inspection must decode image content");
 assert(!app.includes("\\nif("),"literal escaped newline broke app.js syntax");
 assert((app.match(/fallbackFiles.*addEventListener\("change"/g)||[]).length===1,"fallback handlers must be unique");
-assert(sw.includes("saad-ps2-v22"),"service worker cache must be bumped");
+assert(sw.includes("saad-ps2-v23"),"service worker cache must be bumped");
 assert(html.includes("توافق أنظمة Windows"),"Windows compatibility note missing");
 assert(app.includes('identity.platform==="ps1"?"psx-covers":"ps2-covers"')&&app.includes('"https://raw.githubusercontent.com/xlenore/"+repository+"/main/covers/default/"'),"platform-specific cover source selection missing");
 assert(app.includes("function valid(id){const value=String(id||\"\").toUpperCase();return /^[A-Z]{4}_\\d{3}\\.\\d{2}$/.test(value.replace(\"-\",\"_\"))||isPs1Id(value);}"),"PS1 serial validation missing");
@@ -146,7 +146,7 @@ assert(catalog.counts.PS1>=100&&catalog.counts.PS2>=100,"central catalog must co
 assert(catalog.games.every(g=>["PS1","PS2"].includes(g.platform)&&/^[A-Z]{4}-\d{5}$/.test(g.serial)&&typeof g.title==="string"&&g.title.length>0),"catalog records must have valid platform, serial and title");
 assert(new Set(catalog.games.map(g=>g.platform+":"+g.serial)).size===catalog.games.length,"catalog serials must be unique per platform");
 assert(app.includes('split("\\0")'),"UL config must split null-terminated fields");
-assert(sw.includes("saad-ps2-v22"),"service worker cache must be bumped after artwork export changes");
+assert(sw.includes("saad-ps2-v23"),"service worker cache must be bumped after artwork export changes");
 assert(app.includes("scanGameTree"),"recursive game scanner missing");
 assert(app.includes("extractDiscId"),"disc serial extractor missing");
 assert(app.includes("await download(true)"),"automatic missing-art download missing");
@@ -205,9 +205,12 @@ assert.equal(resolverSandbox.resolvePlatform("SLUS_004.02","BIN","Tekken 3 (USA)
 assert.equal(resolverSandbox.resolvePlatform("SCUS_949.00","CUE"),"UNKNOWN","ambiguous serial without title evidence must remain unknown");
 assert.equal(resolverSandbox.resolvePlatform("SLPS_200.15","ISO","Tekken Tag Tournament"),"PS2","unique PS2 catalog serial must remain PS2");
 
-assert(desktopPackage.version==="1.1.2","desktop release version mismatch");
-assert(desktopPackage.devDependencies.electron==="45.2.3","Electron runtime version mismatch");
+assert(desktopPackage.version==="1.1.3","desktop release version mismatch");
+assert(desktopPackage.devDependencies.electron==="45.2.3","maintained Electron runtime version mismatch");
 assert(desktopPackage.devDependencies["electron-builder"]==="26.18.1","electron-builder version mismatch");
+assert(app.includes("تعذر حفظ الصور على الفلاش. أعد توصيله وتحقق من سلامته ثم حاول مجدداً."),"USB failure notification should be short and clear");
+assert(!/Windows 7|Windows 8|Windows 10|Windows 11/.test(downloadPage),"download page should not list supported operating systems");
+assert(app.includes("تعذر حفظ الصور على الفلاش. أعد توصيله وتحقق من سلامته ثم حاول مجدداً."),"USB failure notification should be short and clear");
 assert(desktopPackage.overrides.tar==="7.5.22","tar security override missing");
 assert(desktopPackage.overrides.minimatch==="11.0.4","minimatch security override missing");
 assert(desktopPackage.scripts.smoke&&desktopPackage.scripts.test,"desktop smoke/test commands missing");
@@ -224,3 +227,4 @@ assert(app.includes("const exact=matches.filter(v=>normalizeCatalogTitle(v.title
 assert(app.includes('if(matches.length>1)return "UNKNOWN"'),"ambiguous platform IDs must remain unresolved");
 assert(app.includes("if(S.catalogReady)await S.catalogReady"),"scans must wait for catalog readiness");
 console.log("PASS: JS syntax, populated catalog, PS1/PS2 serial matching, diagnostics, dependency hardening and release workflow.");
+

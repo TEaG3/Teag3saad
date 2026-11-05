@@ -60,6 +60,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/update-game-catalog.cjs
+      - name: Refresh lockfile for the selected runtime
+        working-directory: desktop
+        run: npm install --package-lock-only --ignore-scripts --no-audit
+      - name: Refresh lockfile for the selected runtime
+        working-directory: desktop
+        run: npm install --package-lock-only --ignore-scripts --no-audit
       - name: Install locked desktop dependencies
         working-directory: desktop
         run: npm ci
@@ -81,7 +87,7 @@ jobs:
         uses: actions/upload-artifact@v7.0.2
         with:
           name: Saad-PS2-Windows-PR-${{ github.event.pull_request.number }}
-          path: desktop/release/Saad-PS2-Setup-1.1.2.exe
+          path: desktop/release/Saad-PS2-Setup-1.1.3.exe
           if-no-files-found: error
           retention-days: 7
 
@@ -166,7 +172,7 @@ jobs:
         id: signature
         shell: pwsh
         run: |
-          $installer = "desktop/release/Saad-PS2-Setup-1.1.2.exe"
+          $installer = "desktop/release/Saad-PS2-Setup-1.1.3.exe"
           $signature = Get-AuthenticodeSignature -FilePath $installer
           if ($env:SAAD_SIGNING_EXPECTED -eq "true" -and $signature.Status -ne "Valid") {
             throw "A publisher certificate was configured, but Authenticode verification returned $($signature.Status)."
@@ -179,8 +185,8 @@ jobs:
       - name: Upload Windows Setup installer as workflow artifact
         uses: actions/upload-artifact@v7.0.2
         with:
-          name: Saad-PS2-Windows-Setup-1.1.2
-          path: desktop/release/Saad-PS2-Setup-1.1.2.exe
+          name: Saad-PS2-Windows-Setup-1.1.3
+          path: desktop/release/Saad-PS2-Setup-1.1.3.exe
           if-no-files-found: error
           retention-days: 30
       - name: Remove obsolete assets from the latest release
@@ -200,11 +206,10 @@ jobs:
           name: Saad PS2 Ultimate — Latest Windows Build
           body: |
             أحدث إصدار Windows من Saad PS2 Ultimate.
-            - الإصدار: 1.1.2 — Setup EXE لويندوز 64-bit.
-            - متوافق مع Windows 10 وWindows 11.
+            - الإصدار: 1.1.3 — Setup EXE لويندوز 64-bit.
             - اختبار تشغيل Electron آلياً: نجح ضمن بيئة Windows CI.
             - حالة توقيع Authenticode: ${{ steps.signature.outputs.status }}.
             - اختبار USB/PS2 الحقيقي يحتاج تنفيذ قائمة الفحص على أجهزة فعلية.
-          files: desktop/release/Saad-PS2-Setup-1.1.2.exe
+          files: desktop/release/Saad-PS2-Setup-1.1.3.exe
           make_latest: true
           fail_on_unmatched_files: true
