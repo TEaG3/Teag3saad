@@ -17,8 +17,8 @@
  }
  function classifyPlatform(serial,format){
   const id=String(serial||"").trim().toUpperCase();
-  if(/^[A-Z]{4}-\\d{5}$/.test(id.replace(/_/g,"-")))return "PS1";
-  if(/^[A-Z]{4}_\\d{3}\\.\\d{2}$/.test(id.replace(/-/g,"_")))return "PS2";
+  if(/^[A-Z]{4}-\d{5}$/.test(id.replace(/_/g,"-")))return "PS1";
+  if(/^[A-Z]{4}_\d{3}\.\d{2}$/.test(id.replace(/-/g,"_")))return "PS2";
   const ext=String(format||"").toUpperCase();
   return ["ISO","ZSO","UL"].includes(ext)?"PS2":"UNKNOWN";
  }
