@@ -13,6 +13,7 @@ const desktopMain=fs.readFileSync("desktop/main.cjs","utf8");
 const desktopStage=fs.readFileSync("desktop/scripts/stage-site.cjs","utf8");
 const desktopWorkflow=fs.readFileSync(".github/workflows/windows-exe.yml","utf8");
 const pagesWorkflow=fs.readFileSync(".github/workflows/pages.yml","utf8");
+const downloadPage=fs.readFileSync("downloads.html","utf8");
 new Function(app);
 new Function(sw);
 new Function(engine);
@@ -28,6 +29,9 @@ assert(desktopMain.includes("protocol.registerSchemesAsPrivileged")&&desktopMain
 assert(desktopStage.includes("index.html")&&desktopStage.includes("data"),"desktop staging must package web app and catalog");
 assert(desktopWorkflow.includes("windows-latest")&&desktopWorkflow.includes("npm run dist:win"),"Windows build workflow missing");
 assert(pagesWorkflow.includes("node tests/validate.js")&&pagesWorkflow.includes("actions/deploy-pages@v4"),"web deployment workflow must remain intact");
+assert(downloadPage.includes("Saad-PS2-Portable-1.0.0.exe")&&downloadPage.includes("Saad-PS2-Setup-1.0.0.exe"),"download page must link both Windows editions");
+assert(downloadPage.includes("SmartScreen")&&downloadPage.includes("متطلبات التشغيل"),"download page must explain Windows security and requirements");
+assert(desktopWorkflow.includes("softprops/action-gh-release@v2")&&desktopWorkflow.includes("tag_name: desktop-latest")&&desktopWorkflow.includes("make_latest: true"),"successful Windows builds must publish a latest GitHub release");
 const ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(x=>x[1]);
 assert.equal(new Set(ids).size,ids.length,"duplicate HTML IDs");
 const refs=[...app.matchAll(/\$\("([^"]+)"\)/g)].map(x=>x[1]);
