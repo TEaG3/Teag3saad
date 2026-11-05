@@ -135,7 +135,7 @@ assert.equal(catalog.schemaVersion,1);
 assert.deepEqual(catalog.supportedFormats,["ISO","ZSO","UL","VCD","BIN","CUE","IMG","CHD","PBP"]);
 assert(catalog.games.length>=1000,"central game catalog must contain populated records");
 assert(catalog.counts.PS1>=100&&catalog.counts.PS2>=100,"central catalog must contain PS1 and PS2 title records");
-assert(catalog.games.every(g=>["PS1","PS2"].includes(g.platform)&&/^[A-Z]{4}-\\d{5}$/.test(g.serial)&&typeof g.title==="string"&&g.title.length>0),"catalog records must have valid platform, serial and title");
+assert(catalog.games.every(g=>["PS1","PS2"].includes(g.platform)&&/^[A-Z]{4}-\d{5}$/.test(g.serial)&&typeof g.title==="string"&&g.title.length>0),"catalog records must have valid platform, serial and title");
 assert(new Set(catalog.games.map(g=>g.platform+":"+g.serial)).size===catalog.games.length,"catalog serials must be unique per platform");
 assert(app.includes('split("\\0")'),"UL config must split null-terminated fields");
 assert(sw.includes("saad-ps2-v18"),"service worker cache must be bumped after artwork export changes");
