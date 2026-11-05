@@ -381,16 +381,15 @@ function catalogOplId(record){
 function findCatalogRecord(id){
  const key=catalogSerial(id);if(!key)return null;
  const matches=S.catalog.filter(v=>catalogSerial(v.serial)===key&&["PS1","PS2"].includes(v.platform));
- if(matches.length===1)return matches[0];
- if(matches.length>1){
-  const preferred=isPs1Id(id)?"PS1":/^[A-Z]{4}[_-]\d{3}\.\d{2}$/.test(String(id||"").toUpperCase())?"PS2":null;
-  return preferred?matches.find(v=>v.platform===preferred)||null:null;
- }
- return null;
+ return matches.length===1?matches[0]:null;
 }
 function resolvePlatform(id,format){
- const record=findCatalogRecord(id);
- if(record)return record.platform;
+ const key=catalogSerial(id);
+ if(key){
+  const matches=S.catalog.filter(v=>catalogSerial(v.serial)===key&&["PS1","PS2"].includes(v.platform));
+  if(matches.length===1)return matches[0].platform;
+  if(matches.length>1)return "UNKNOWN";
+ }
  return window.PS2Database.classifyPlatform(id,format);
 }
 async function syncCentralCatalog(){
