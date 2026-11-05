@@ -5,6 +5,7 @@ const assert=require("assert");
 const path=require("path");
 const ROOT=path.resolve(__dirname,"..");
 const readFile=file=>fs.readFileSync(path.join(ROOT,file),"utf8");
+const catalogUtils=require("../scripts/update-game-catalog.cjs");
 const html=readFile("index.html");
 const app=readFile("app.js");
 const css=readFile("styles.css");
