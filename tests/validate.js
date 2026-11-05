@@ -37,6 +37,8 @@ assert.equal(report.total,3);
 assert.equal(report.duplicateIds,1);
 assert.equal(report.missingId,1);
 assert.equal(report.incompleteUl,1);
+const formatReport=db.inspectLibrary(["ISO","ZSO","UL","VCD","BIN","CUE","IMG","CHD","PBP"].map((format,i)=>({gameId:"FILE_"+String(i).padStart(8,"0"),format,size:100,source:"test/"+format})).filter(x=>x.gameId));
+assert.equal(formatReport.issues.filter(x=>x.type==="format").length,0,"all supported disc image formats must be recognized");
 assert(css.includes("#diagnosticResults"),"diagnostics styles missing");
 assert(!app.includes("\\nif("),"literal escaped newline broke app.js syntax");
 assert((app.match(/fallbackFiles.*addEventListener\("change"/g)||[]).length===1,"fallback handlers must be unique");
