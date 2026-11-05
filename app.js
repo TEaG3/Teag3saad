@@ -101,7 +101,7 @@ async function extractDiscId(file){
   try{const text=await file.slice(0,1048576).text();const m=text.toUpperCase().match(/([A-Z]{4}[-_]\d{5})|([A-Z]{4}[_-]\d{3}\.\d{2})/);if(m)return m[1]?normalizePs1Id(m[1]):m[2].replace("-","_");}catch(e){}
   return null;
  }
- if(["iso","bin","img","zso","chd","pbp"].indexOf(ext)<0)return null;
+ if(["iso","bin","img","zso","chd","pbp","vcd"].indexOf(ext)<0)return null;
  try{
   const bytes=await file.slice(0,33554432).arrayBuffer(),txt=new TextDecoder("ascii").decode(bytes);
   const ps2=txt.match(/\b([A-Z]{4}[_-]\d{3}\.\d{2})\b/i);if(ps2)return ps2[1].toUpperCase().replace("-","_");
@@ -123,7 +123,7 @@ async function scanGameTree(dir,prefix){
   try{
    let file=await ent.getFile(),id=await extractDiscId(file);
    if(ext==="cue"&&!id){const companion=entries.find(e=>e.kind==="file"&&e.name.toLowerCase()===base+".bin");if(companion){file=await companion.getFile();id=await extractDiscId(file);}}
-   const platform=((id&&isPs1Id(id))||["bin","cue","img","chd","pbp"].includes(ext))?"PS1":"PS2";
+   const platform=((id&&isPs1Id(id))||["bin","cue","img","chd","pbp","vcd"].includes(ext))?"PS1":"PS2";
    const path=(prefix?prefix+"/":"")+ent.name;
    out.push({title:ent.name.replace(/\.[^.]+$/,""),recordKey:localKey("LIB",path.toLowerCase()),gameId:id||localKey("FILE",path.toLowerCase()),oplGameId:id||null,format:ext.toUpperCase(),platform,size:file.size,hasCover:false,hasIcon:false,source:path});
   }catch(e){log("تعذر قراءة "+ent.name+": "+e.message);}
@@ -141,7 +141,7 @@ async function scanSelectedFiles(fileList){
  for(let i=0;i<gameFiles.length;i++){
   const f=gameFiles[i];
   try{
-    const path=pathOf(f),parts=path.split("/"),id=await extractDiscId(f),ext=f.name.split(".").pop().toUpperCase(),platform=((id&&isPs1Id(id))||["BIN","CUE","IMG","CHD","PBP"].includes(ext))?"PS1":"PS2";
+    const path=pathOf(f),parts=path.split("/"),id=await extractDiscId(f),ext=f.name.split(".").pop().toUpperCase(),platform=((id&&isPs1Id(id))||["BIN","CUE","IMG","CHD","PBP","VCD"].includes(ext))?"PS1":"PS2";
     S.games.push({title:f.name.replace(/\.[^.]+$/,""),recordKey:localKey("LIB",path.toLowerCase()),gameId:id||localKey("FILE",path.toLowerCase()),oplGameId:id||null,format:ext,platform,size:f.size,hasCover:false,hasIcon:false,source:path,folder:parts.length>1?parts[parts.length-2]:"ROOT"});
   }catch(e){log("تعذر تحليل "+f.name+": "+e.message);}
  }
