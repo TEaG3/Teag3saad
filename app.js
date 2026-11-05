@@ -1,6 +1,6 @@
 "use strict";
 const $=id=>document.getElementById(id);
-const S={root:null,offline:null,games:[],filter:"all",query:"",logs:[],busy:false,db:null,activeGame:null};
+const S={root:null,offline:null,games:[],filter:"all",query:"",logs:[],busy:false,db:null,activeGame:null,catalog:[],catalogStatus:"جارٍ تحميل القاعدة"};
 const isPs1Id=id=>/^[A-Z]{4}-\d{5}$/.test(String(id||"").toUpperCase().replace("_","-"));
 const normalizePs1Id=id=>String(id||"").toUpperCase().replace("_","-");
 const coverUrls=id=>isPs1Id(id)?["https://raw.githubusercontent.com/xlenore/psx-covers/main/covers/default/"+normalizePs1Id(id)+".jpg"]:["https://raw.githubusercontent.com/xlenore/ps2-covers/main/covers/default/"+id.replace("_","-")+".jpg","https://raw.githubusercontent.com/xlenore/ps2-covers/main/covers/default/"+id+".jpg","https://art.gametdb.com/ps2/cover/US/"+id.replace("_","-")+".jpg"];
@@ -246,7 +246,7 @@ $("scan").onclick=scan;$("rescan").onclick=scan;$("csv").onclick=csv;$("missing"
 $("offline").onclick=async()=>{if(!("showDirectoryPicker"in window)){msg("اختيار مجلد الصور المحلي غير مدعوم في هذا المتصفح؛ يمكنك استخدام الصور المتاحة عبر الإنترنت.",true);return;}try{S.offline=await showDirectoryPicker({mode:"read"});$("offlineName").textContent=S.offline.name;msg("تم اختيار مجلد الصور.");}catch(e){}};
 if("serviceWorker"in navigator&&location.protocol.startsWith("http"))navigator.serviceWorker.register("./sw.js").catch(()=>{});
 
-function openDb(){return new Promise((resolve,reject)=>{const req=indexedDB.open("saad-ps2-db",2);req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains("games"))db.createObjectStore("games",{keyPath:"gameId"});if(!db.objectStoreNames.contains("library"))db.createObjectStore("library",{keyPath:"recordKey"});};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);req.onblocked=()=>reject(new Error("أغلق النسخ القديمة من الموقع لإكمال تحديث قاعدة البيانات."));});}
+function openDb(){return new Promise((resolve,reject)=>{const req=indexedDB.open("saad-ps2-db",3);req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains("games"))db.createObjectStore("games",{keyPath:"gameId"});if(!db.objectStoreNames.contains("library"))db.createObjectStore("library",{keyPath:"recordKey"});if(!db.objectStoreNames.contains("catalog"))db.createObjectStore("catalog",{keyPath:"id"});};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);req.onblocked=()=>reject(new Error("أغلق النسخ القديمة من الموقع لإكمال تحديث قاعدة البيانات."));});}
 async function getDb(){if(!S.db)S.db=await openDb();return S.db;}
 async function allMetadata(){const d=await getDb();return new Promise((resolve,reject)=>{const r=d.transaction("games","readonly").objectStore("games").getAll();r.onsuccess=()=>resolve(r.result||[]);r.onerror=()=>reject(r.error);});}
 async function allLibrary(){const d=await getDb();return new Promise((resolve,reject)=>{const r=d.transaction("library","readonly").objectStore("library").getAll();r.onsuccess=()=>resolve(r.result||[]);r.onerror=()=>reject(r.error);});}
@@ -254,10 +254,19 @@ async function saveLibrary(rows){const d=await getDb();return new Promise((resol
 async function restoreLastScan(){try{const rows=await allLibrary();if(!rows.length)return;S.games=rows;await hydrateMetadata();render();$("driveName").textContent="آخر مكتبة محفوظة";$("driveInfo").textContent=rows.length+" لعبة محفوظة محلياً؛ أعد اختيار USB لتحديث الصور";log("تم استعادة آخر فهرس ألعاب محفوظ من قاعدة البيانات المحلية.");}catch(e){log("تعذر استعادة فهرس الألعاب: "+e.message);}}
 async function putMetadata(v){const d=await getDb();return new Promise((resolve,reject)=>{const tx=d.transaction("games","readwrite");tx.objectStore("games").put(v);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});}
 async function removeMetadata(id){const d=await getDb();return new Promise((resolve,reject)=>{const tx=d.transaction("games","readwrite");tx.objectStore("games").delete(id);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});}
+async function readCatalogCache(){const d=await getDb();return new Promise((resolve,reject)=>{const q=d.transaction("catalog","readonly").objectStore("catalog").get("snapshot");q.onsuccess=()=>resolve(q.result?.data||null);q.onerror=()=>reject(q.error);});}
+async function writeCatalogCache(data){const d=await getDb();return new Promise((resolve,reject)=>{const tx=d.transaction("catalog","readwrite");tx.objectStore("catalog").put({id:"snapshot",data,savedAt:new Date().toISOString()});tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});}
+function findCatalogRecord(id){const key=String(id||"").toUpperCase().replace(/_/g,"-");return S.catalog.find(v=>String(v.serial||"").toUpperCase().replace(/_/g,"-")===key)||null;}
+async function syncCentralCatalog(){
+ const validData=v=>v&&v.schemaVersion===1&&Array.isArray(v.games);
+ try{const response=await fetch("./data/game-catalog.json",{cache:"no-store"});if(!response.ok)throw new Error("HTTP "+response.status);const data=await response.json();if(!validData(data))throw new Error("invalid catalog schema");S.catalog=data.games;await writeCatalogCache(data);S.catalogStatus="متصل · "+S.catalog.length+" سجل مركزي";}
+ catch(e){try{const cached=await readCatalogCache();if(validData(cached)){S.catalog=cached.games;S.catalogStatus="دون إنترنت · نسخة محلية · "+S.catalog.length+" سجل";}else S.catalogStatus="القاعدة غير متاحة";}catch(err){S.catalogStatus="القاعدة غير متاحة";}}
+ await hydrateMetadata();if(S.games.length)render();const el=$("catalogStatus");if(el)el.textContent=S.catalogStatus;log("قاعدة الألعاب: "+S.catalogStatus+".");
+}
 async function hydrateMetadata(){
  try{
   const rows=await allMetadata(),map=new Map(rows.map(v=>[v.gameId,v]));
-  S.games.forEach(g=>{g.meta=map.get(g.gameId)||null;g.oplGameId=g.meta?.oplGameId||(valid(g.gameId)?g.gameId:null);});
+  S.games.forEach(g=>{const local=map.get(g.gameId)||null,central=findCatalogRecord(effectiveId(g));g.catalog=central;g.meta=local||(central?{title:central.title||g.title,genre:central.genre||"",region:central.region||"",year:central.year||"",publisher:central.publisher||"",developer:central.developer||""}:null);g.oplGameId=local?.oplGameId||(central?.serial?(isPs1Id(central.serial)?normalizePs1Id(central.serial):String(central.serial).replace("-","_")):null)||(valid(g.gameId)?g.gameId:null);});
  }catch(e){log("تعذر تحميل قاعدة البيانات المحلية: "+e.message);}
 }
 function showGame(id){
@@ -294,7 +303,7 @@ async function restoreDb(file){
   if(Array.isArray(data.library)){
    const inventory=[];
    for(const v of data.library){
-    if(!v||!["ISO","ZSO","UL"].includes(v.format))continue;
+    if(!v||!["ISO","ZSO","UL","BIN","CUE","IMG","CHD","PBP","VCD"].includes(v.format))continue;
     const source=String(v.source||v.title||"restored");
     const gameId=validRecordKey(v.gameId)?v.gameId:localKey("FILE",source);
     const recordKey=/^LIB_[A-F0-9]{8}$/.test(String(v.recordKey||""))?v.recordKey:localKey("LIB",source+"|"+gameId);
@@ -317,6 +326,7 @@ $("restore").onclick=()=>$("restoreFile").click();
 $("restoreFile").onchange=e=>{if(e.target.files[0])restoreDb(e.target.files[0]);e.target.value="";};
 
 render();
+syncCentralCatalog();
 function renderStorageCapabilities(){
  const c=window.PS2Database?.storageCapabilities();if(!c)return;
  const e=$("storageSupport");e.innerHTML="<b>دعم وحدات التخزين على الجهاز:</b> "+esc(c.message)+"<br><b>صلاحية الموقع:</b> "+(c.write?"قراءة وكتابة بعد موافقة المستخدم":"الوصول المباشر للكتابة غير متاح")+(c.ios?" · جهاز iPad/iPhone":"")+"<br><b>توافق OPL USB:</b> "+esc(c.oplUsbFilesystems);
