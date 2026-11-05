@@ -12,8 +12,8 @@
     "dist:win": "npm run dist:portable && npm run dist:setup"
   },
   "devDependencies": {
-    "electron": "^39.2.7",
-    "electron-builder": "^26.0.12"
+    "electron": "39.2.7",
+    "electron-builder": "26.0.12"
   },
   "build": {
     "appId": "com.saadps2.ultimate",
