@@ -41,6 +41,9 @@ assert(app.includes("await verifySavedArt(art,coverName,140,200)"),"cover verifi
 assert(app.includes("await verifySavedArt(icons,iconName,64,64)"),"icon verification must use ICONS folder");
 assert(html.includes('src="./ps2-database.js"'),"database engine must load before app");
 assert(html.includes('id="runDiagnostics"'),"diagnostics button missing");
+assert(app.includes('!/_ICO\\.PNG$/i.test(entry.name)'),"legacy icon migration must match the literal .PNG extension");
+assert(html.indexOf('id="diagnosticResults"')>html.indexOf('id="runDiagnostics"')&&html.indexOf('id="diagnosticResults"')<html.indexOf("</details>",html.indexOf('id="runDiagnostics"')),"artwork diagnostics results must be inside advanced options beside their button");
+assert(html.includes('id="diagnosticResults" class="notice" hidden aria-live="polite"'),"artwork diagnostics results must be announced accessibly");
 assert(html.includes('id="missing"')&&html.includes('id="all"'),"simple artwork download actions missing");
 assert(html.includes('id="downloadWindowsApp"')&&html.includes('href="./downloads.html"'),"website Windows download link must remain available");
 assert(app.includes('if(window.saadDesktop?.isDesktop)document.getElementById("downloadWindowsApp")?.remove();'),"Windows download link must be hidden only in the desktop app");
