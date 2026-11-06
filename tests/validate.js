@@ -120,7 +120,7 @@ assert(engine.includes("legacyIcons:0"),"legacy icon migration report missing");
 assert(engine.includes("createImageBitmap(file)"),"artwork inspection must decode image content");
 assert(!app.includes("\\nif("),"literal escaped newline broke app.js syntax");
 assert((app.match(/fallbackFiles.*addEventListener\("change"/g)||[]).length===1,"fallback handlers must be unique");
-assert(sw.includes("saad-ps2-v23"),"service worker cache must be bumped");
+assert(sw.includes("saad-ps2-v24"),"service worker cache must be bumped");
 assert(app.includes('identity.platform==="ps1"?"psx-covers":"ps2-covers"')&&app.includes('"https://raw.githubusercontent.com/xlenore/"+repository+"/main/covers/default/"'),"platform-specific cover source selection missing");
 assert(app.includes("function valid(id){const value=String(id||\"\").toUpperCase();return /^[A-Z]{4}_\\d{3}\\.\\d{2}$/.test(value.replace(\"-\",\"_\"))||isPs1Id(value);}"),"PS1 serial validation missing");
 assert(app.includes("normalizePs1Id"),"PS1 serial normalization missing");
@@ -145,7 +145,7 @@ assert(catalog.counts.PS1>=100&&catalog.counts.PS2>=100,"central catalog must co
 assert(catalog.games.every(g=>["PS1","PS2"].includes(g.platform)&&/^[A-Z]{4}-\d{5}$/.test(g.serial)&&typeof g.title==="string"&&g.title.length>0),"catalog records must have valid platform, serial and title");
 assert(new Set(catalog.games.map(g=>g.platform+":"+g.serial)).size===catalog.games.length,"catalog serials must be unique per platform");
 assert(app.includes('split("\\0")'),"UL config must split null-terminated fields");
-assert(sw.includes("saad-ps2-v23"),"service worker cache must be bumped after artwork export changes");
+assert(sw.includes("saad-ps2-v24"),"service worker cache must be bumped after artwork export changes");
 assert(app.includes("scanGameTree"),"recursive game scanner missing");
 assert(app.includes("extractDiscId"),"disc serial extractor missing");
 assert(app.includes("await download(true)"),"automatic missing-art download missing");
