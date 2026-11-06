@@ -227,7 +227,7 @@ assert(app.includes('if(matches.length>1)return "UNKNOWN"'),"ambiguous platform 
 assert(app.includes("if(S.catalogReady)await S.catalogReady"),"scans must wait for catalog readiness");
 
 assert(app.includes('!/_ICO\\.PNG$/i.test(entry.name)'),"legacy icon migration must match _ICO.PNG filenames");
-assert(/_ICO\\.PNG$/i.test("SLUS_203.12_ICO.PNG"),"legacy icon filename regression check failed");
+assert(/_ICO\.PNG$/i.test("SLUS_203.12_ICO.PNG"),"legacy icon filename regression check failed");
 const advancedOptions=html.slice(html.indexOf("<summary>خيارات متقدمة</summary>"),html.indexOf("</details>",html.indexOf("<summary>خيارات متقدمة</summary>")));
 assert(advancedOptions.includes('id="runDiagnostics"')&&advancedOptions.includes('id="diagnosticResults"'),"artwork diagnostic results must be displayed beside the diagnostics button");
 assert((html.match(/id="diagnosticResults"/g)||[]).length===1,"diagnostic results panel must exist exactly once");
