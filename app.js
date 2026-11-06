@@ -358,6 +358,28 @@ async function verifyUsbWriteAccess(){
   throw new Error("USB_WRITE_FAILED");
  }
 }
+async function migrateLegacyIcons(art,icons){
+ let moved=0,kept=0,failed=0;
+ for await(const entry of art.values()){
+  if(entry.kind!=="file"||!/_ICO\\.PNG$/i.test(entry.name))continue;
+  try{
+   let targetValid=false;
+   try{await verifySavedArt(icons,entry.name,64,64);targetValid=true;}catch(e){}
+   if(!targetValid){
+    const source=await entry.getFile();
+    await save(icons,entry.name,source);
+    await verifySavedArt(icons,entry.name,64,64);
+    moved++;
+   }else kept++;
+   await art.removeEntry(entry.name);
+  }catch(error){
+   failed++;
+   log("تعذر نقل الأيقونة القديمة "+entry.name+" إلى ICONS: "+(error.message||error));
+  }
+ }
+ if(moved||kept||failed)log("تنظيم الأيقونات القديمة: نُقلت "+moved+"، كانت موجودة مسبقاً "+kept+"، تعذر نقل "+failed+".");
+ return {moved,kept,failed};
+}
 async function verifySavedArt(dir,name,width,height){
  const file=await(await dir.getFileHandle(name)).getFile();
  if(!file.size)throw new Error(name+" ملف فارغ بعد الحفظ.");
@@ -401,6 +423,7 @@ async function download(onlyMissing){
   await verifyUsbWriteAccess();
   const art=await S.root.getDirectoryHandle("ART",{create:true});
   const icons=await S.root.getDirectoryHandle("ICONS",{create:true});
+  await migrateLegacyIcons(art,icons);
   for(let i=0;i<list.length;i++){
    const g=list[i],id=effectiveId(g);
    $("progressText").textContent="تنزيل وحفظ: "+(g.meta?.title||g.title);
