@@ -361,7 +361,7 @@ async function verifyUsbWriteAccess(){
 async function migrateLegacyIcons(art,icons){
  let moved=0,kept=0,failed=0;
  for await(const entry of art.values()){
-  if(entry.kind!=="file"||!/_ICO\\.PNG$/i.test(entry.name))continue;
+  if(entry.kind!=="file"||!/_ICO\.PNG$/i.test(entry.name))continue;
   try{
    let targetValid=false;
    try{await verifySavedArt(icons,entry.name,64,64);targetValid=true;}catch(e){}
