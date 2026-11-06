@@ -225,6 +225,12 @@ assert(app.includes("fetchArt(id,g.platform||g.catalog?.platform)"),"artwork dow
 assert(app.includes("const exact=matches.filter(v=>normalizeCatalogTitle(v.title)===wanted)"),"duplicate serials must be resolved only by an exact normalized title match");
 assert(app.includes('if(matches.length>1)return "UNKNOWN"'),"ambiguous platform IDs must remain unresolved");
 assert(app.includes("if(S.catalogReady)await S.catalogReady"),"scans must wait for catalog readiness");
+
+assert(app.includes('!/_ICO\\.PNG$/i.test(entry.name)'),"legacy icon migration must match _ICO.PNG filenames");
+assert(/_ICO\\.PNG$/i.test("SLUS_203.12_ICO.PNG"),"legacy icon filename regression check failed");
+const advancedOptions=html.slice(html.indexOf("<summary>خيارات متقدمة</summary>"),html.indexOf("</details>",html.indexOf("<summary>خيارات متقدمة</summary>")));
+assert(advancedOptions.includes('id="runDiagnostics"')&&advancedOptions.includes('id="diagnosticResults"'),"artwork diagnostic results must be displayed beside the diagnostics button");
+assert((html.match(/id="diagnosticResults"/g)||[]).length===1,"diagnostic results panel must exist exactly once");
 console.log("PASS: JS syntax, populated catalog, PS1/PS2 serial matching, diagnostics, dependency hardening and release workflow.");
 
 
